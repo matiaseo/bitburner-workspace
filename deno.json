@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "types": [
+      "./NetscriptDefinitions.d.ts"
+    ]
+  },
+  "include": [
+    "global.d.ts",
+    "src/**/*"
+  ],
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "unstable": ["kv", "cron"]
+}
