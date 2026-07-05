@@ -2,7 +2,7 @@
 
 Running sync:
 ```
-deno run --allow-net --allow-read sync.js
+deno run --allow-read sync.js
 ```
 
 ## ⌨️ Neovim Workspace Hotkeys

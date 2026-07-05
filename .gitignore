@@ -1,5 +1,3 @@
-.nvim/.data/
-.nvim/.cache/
-.nvim/pack/
 .bitburner/
 
+sync.log

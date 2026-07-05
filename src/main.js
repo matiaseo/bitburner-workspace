@@ -1,6 +1,6 @@
 
-/** @param {NS} ns */
-export async function main(ns) {
-  console.log(ns)
+/** @param {NS} api */
+export async function main(api) {
+  console.log(api)
 }
 

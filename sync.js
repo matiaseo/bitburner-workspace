@@ -1,30 +1,25 @@
-// sync.js
-import { join } from "https://deno.land";
+const port = 12525
+const sources = 'src/'
 
-const PORT = 12525;
-const TARGET_DIR = "./src"; // Your local script folder
-const WS_URL = `ws://localhost:${PORT}/`;
+const activeSockets = new Set()
+const startSync = socket => activeSockets.add(socket)
+const stopSync = socket => activeSockets.delete(socket)
 
-console.log(`Connecting to Bitburner on ${WS_URL}...`);
-let ws;
-
-function connect() {
-  ws = new WebSocket(WS_URL);
-  
-  ws.onopen = () => console.log("Connected to Steam client successfully!");
-  ws.onerror = (e) => console.error("WebSocket error:", e);
-  ws.onclose = () => {
-    console.log("Connection lost. Retrying in 3 seconds...");
-    setTimeout(connect, 3000);
-  };
-}
+console.log(new Date().toISOString(), 'Starting sync server')
+Deno.serve({port}, request => {
+  const { socket, response } = Deno.upgradeWebSocket(request)
+  socket.addEventListener('open', () => console.log('new ws connection') || startSync(socket))
+  socket.addEventListener('message', event => console.log('got message', event.data))
+  socket.addEventListener('close', () => stopSync(socket))
+  return response
+})
 
 async function pushFile(filePath) {
   try {
     const content = await Deno.readTextFile(filePath);
     // Convert system path to Bitburner in-game path
-    const relativePath = filePath.replace(TARGET_DIR, "");
-    
+    const relativePath = 'scripts/' + filePath.split(sources).slice(-1);
+
     const payload = {
       jsonrpc: "2.0",
       method: "pushFile",
@@ -36,21 +31,22 @@ async function pushFile(filePath) {
       id: Date.now()
     };
 
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(payload));
-      console.log(`[Synced] ${relativePath}`);
-    }
+console.log('sending', payload)
+
+    for (const ws of activeSockets)
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(payload));
+        console.log(new Date().toISOString(), `[Synced] ${relativePath}`);
+      }
   } catch (err) {
     console.error(`Failed to read file ${filePath}:`, err);
   }
 }
 
-// Start connection
-connect();
 
 // Watch the directory natively
-console.log(`Watching ${TARGET_DIR} for changes...`);
-const watcher = Deno.watchFs(TARGET_DIR);
+console.log(`Watching for changes...`);
+const watcher = Deno.watchFs(sources);
 for await (const event of watcher) {
   if (event.kind === "modify" || event.kind === "create") {
     for (const path of event.paths) {
