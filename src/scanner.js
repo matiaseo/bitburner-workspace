@@ -38,30 +38,31 @@ const getUsefulValues = (ns, host) => {
 }
 
 /** @param {NS} ns */
-const getInfo = ns => host => ({
-  host,
+const getInfo = (ns, distance) => host => ({
+  host, distance,
   ...getUsefulValues(ns, host),
   //...filterServerData(ns.getServer(host))
 })
 
-const scan = (ns, depth, base) =>
-  !depth ? [getInfo(ns)(base)] :
+const scan = (ns, depth, base, distance=1) =>
+  !depth ? [getInfo(ns, distance)(base)] :
     [base].concat(
       ns.scan(base)
         .slice(+!!base)
-        .map(getInfo(ns))
-        .map(target => Object.assign({ target },
-          depth > 1 && { connected: scan(ns, depth-1, target.host).slice(1) }
-        ))
+        .map(getInfo(ns, distance))
+        .map(target => {
+          const connected = scan(ns, depth-1, target.host, distance+1).slice(1)
+          return Object.assign({ target }, !!connected.length && { connected })
+        })
     ).filter(Boolean)
 
 /** @param {NS} ns */
 export function main(ns) {
   const depth = Math.max(+ns.args[0]|0, 1)
-  const fileName = ns.args[1] || `targets${depth}.json`
+  const fileName = `targets${depth}${new Date().toISOString().slice(0,10)}.json`
   const targets = scan(ns, depth)
   //ns.tprint('INFO ' + JSON.stringify(targets, null, 2))
   ns.tprint('WARN search depth: ' + depth)
-  ns.write(fileName, JSON.stringify(targets, null, 2))
-  ns.tprint('WARN wrote file:\t' + ns.ls('home', fileName))
+  ns.write(fileName, JSON.stringify(targets, null, 2), 'w')
+  ns.tprint('WARN wrote file:\t' + fileName)
 }
