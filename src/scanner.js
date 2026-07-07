@@ -26,12 +26,13 @@ const getUsefulValues = (ns, host) => {
     hasAdminRights: hasRoot,
     moneyMax: maxMoney,
     numOpenPortsRequired,
+    openPortCount
   } = ns.getServer(host)
 
   return {
     level,//: ns.getServerRequiredHackingLevel(host),
     maxMoney,//: ns.getServerMaxMoney(host),
-    status: hasRoot ? 'root' : sshPortOpen || !numOpenPortsRequired ? 'nukable' : 'sshClosed',
+    status: hasRoot ? 'root' : sshPortOpen || !numOpenPortsRequired ? 'nukable' : openPortCount,
     //hasRoot,
     //...details
   }
@@ -52,7 +53,7 @@ const scan = (ns, depth, base, distance=1) =>
         .map(getInfo(ns, distance))
         .map(target => {
           const connected = scan(ns, depth-1, target.host, distance+1).slice(1)
-          return Object.assign({ target }, !!connected.length && { connected })
+          return Object.assign({}, target, !!connected.length && { connected })
         })
     ).filter(Boolean)
 
