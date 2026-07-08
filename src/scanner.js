@@ -24,14 +24,21 @@ const getUsefulValues = (ns, host) => {
     sshPortOpen,
     requiredHackingSkill: level,
     hasAdminRights: hasRoot,
-    moneyMax: maxMoney,
+    moneyMax,
     numOpenPortsRequired,
+    minDifficulty,
+    hackDifficulty,
+    moneyAvailable,
     openPortCount
   } = ns.getServer(host)
 
   return {
     level,//: ns.getServerRequiredHackingLevel(host),
-    maxMoney,//: ns.getServerMaxMoney(host),
+    minDifficulty,
+    hackDifficulty,
+    moneyAvailable,
+    moneyMax,//: ns.getServerMaxMoney(host),
+    ent: moneyMax / minDifficulty,
     status: hasRoot ? 'root' : sshPortOpen || !numOpenPortsRequired ? 'nukable' : openPortCount,
     //hasRoot,
     //...details
@@ -58,8 +65,8 @@ const scan = (ns, depth, base, distance=1) =>
     ).filter(Boolean)
 
 /** @param {NS} ns */
-export function main(ns) {
-  const depth = Math.max(+ns.args[0]|0, 1)
+export function main(ns, otherDepth) {
+  const depth = Math.max(+ns.args[0]|0, 1, otherDepth)
   const fileName = `targets${depth}${new Date().toISOString().slice(0,10)}.json`
   const targets = scan(ns, depth)
   //ns.tprint('INFO ' + JSON.stringify(targets, null, 2))
