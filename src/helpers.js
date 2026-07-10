@@ -17,3 +17,8 @@ export const jisn = (tt, ...xx) =>
   zip(tt, xx.map(x => typeof x === 'string' ? x : JSON.stringify(x ?? null, null, 2)))
     .filter(Boolean)
     .join('')
+
+export const toColumns = list => {
+  const colWidth = (list.reduce((maxLength, text) => Math.max(maxLength, text.length), 0) + 20) & 0xffc
+  return list.map(text => text + ' '.repeat(colWidth - text.length)).join('')
+}

@@ -49,19 +49,19 @@ const getUsefulValues = (ns, host) => {
 
 /** @param {NS} ns */
 const getInfo = (ns, path) => host => ({
-  host, path,
+  host, path: ''+path, distance: path.length,
   ...getUsefulValues(ns, host),
   //...filterServerData(ns.getServer(host))
 })
 
-const scan = (ns, depth, base, path='home') =>
+export const scan = (ns, depth, base, path=['home']) =>
   !depth ? [getInfo(ns, path)(base)] :
     [base].concat(
       ns.scan(base)
         .slice(+!!base)
         .map(getInfo(ns, path))
         .map(target => {
-          const connected = scan(ns, depth-1, target.host, `${path}/${target.host}`).slice(1)
+          const connected = scan(ns, depth-1, target.host, path.concat(target.host)).slice(1)
           return Object.assign({}, target, !!connected.length && { connected })
         })
     ).filter(Boolean)
