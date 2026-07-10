@@ -1,4 +1,4 @@
-import { flatten } from './helpers.js'
+import { flatten, jisn } from './helpers.js'
 
 /** @param {NS} ns */
 export function main(ns) {
@@ -17,10 +17,11 @@ export function main(ns) {
       case 3: if(hackingLevel > 250) ns.tprint(`WARN smptd ${host.host}: ` + await ns.relaysmtp(host.host))
       case 2: if(hackingLevel > 100) ns.tprint(`WARN ftpd ${host.host}: ` + await ns.ftpcrack(host.host))
       case 1: if(hackingLevel > 10) ns.tprint(`WARN brutd ${host.host}: ` + await ns.brutessh(host.host))
+      case 0:
       case 'nukable':
         ns.tprint(`WARN nukin ${host.host}: ` + await ns.nuke(host.host))
         break
-      default: ns.tprint('ERROR huh?')
+      default: ns.tprint(jisn`ERROR huh? ${host}`)
     }
   })
 

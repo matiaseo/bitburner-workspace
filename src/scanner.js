@@ -29,7 +29,8 @@ const getUsefulValues = (ns, host) => {
     minDifficulty,
     hackDifficulty,
     moneyAvailable,
-    openPortCount
+    openPortCount,
+    maxRam
   } = ns.getServer(host)
 
   return {
@@ -38,35 +39,36 @@ const getUsefulValues = (ns, host) => {
     hackDifficulty,
     moneyAvailable,
     moneyMax,//: ns.getServerMaxMoney(host),
+    maxRam,
     ent: moneyMax / minDifficulty,
-    status: hasRoot ? 'root' : sshPortOpen || !numOpenPortsRequired ? 'nukable' : openPortCount,
+    status: hasRoot ? 'root' : sshPortOpen || !numOpenPortsRequired ? 'nukable' : numOpenPortsRequired - openPortCount,
     //hasRoot,
     //...details
   }
 }
 
 /** @param {NS} ns */
-const getInfo = (ns, distance) => host => ({
-  host, distance,
+const getInfo = (ns, path) => host => ({
+  host, path,
   ...getUsefulValues(ns, host),
   //...filterServerData(ns.getServer(host))
 })
 
-const scan = (ns, depth, base, distance=1) =>
-  !depth ? [getInfo(ns, distance)(base)] :
+const scan = (ns, depth, base, path='home') =>
+  !depth ? [getInfo(ns, path)(base)] :
     [base].concat(
       ns.scan(base)
         .slice(+!!base)
-        .map(getInfo(ns, distance))
+        .map(getInfo(ns, path))
         .map(target => {
-          const connected = scan(ns, depth-1, target.host, distance+1).slice(1)
+          const connected = scan(ns, depth-1, target.host, `${path}/${target.host}`).slice(1)
           return Object.assign({}, target, !!connected.length && { connected })
         })
     ).filter(Boolean)
 
 /** @param {NS} ns */
 export function main(ns, otherDepth) {
-  const depth = Math.max(+ns.args[0]|0, 1, otherDepth)
+  const depth = Math.max(+ns.args[0]|0, 1, otherDepth|0)
   const fileName = `targets${depth}${new Date().toISOString().slice(0,10)}.json`
   const targets = scan(ns, depth)
   //ns.tprint('INFO ' + JSON.stringify(targets, null, 2))
