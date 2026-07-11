@@ -1,30 +1,39 @@
 import { flatten, jisn } from './helpers.js'
+import { scan } from './scanner.js'
 
-/** @param {NS} ns */
-export function main(ns) {
-  const fileName = ns.ls('home', 'targets').toSorted().slice(-1)[0]
+const getMaxPorts = ns =>
+  ns.ls('home', '.exe')
+    .filter(file =>
+      ['SQLInject','FTPCrack', 'HTTPWorm', 'BruteSSH', 'relaySMTP'].includes(...file.split('.'))
+    ).length
+const tools = ns => [
+  ns.sqlinject,
+  ns.httpworm,
+  ns.relaysmtp,
+  ns.ftpcrack,
+  ns.brutessh
+]
+
+ /** @param {NS} ns */
+export async function main(ns) {
+  //const fileName = ns.ls('home', 'targets').toSorted().slice(-1)[0]
   const hackingLevel = ns.getPlayer().skills.hacking
-  ns.tprint('WARN reading: ' + fileName)
-  const targets = flatten(JSON.parse(ns.read(fileName)))
-    .filter(({status, level}) => status !== 'root' && level <= hackingLevel)
+  //ns.tprint('WARN reading: ' + fileName)
+  const maxPorts = getMaxPorts(ns)
+  ns.tprint('WARN maxPorts = ' + maxPorts)
+  //const targets = flatten(JSON.parse(ns.read(fileName)))
+  const targets = flatten(scan(ns, 32))
+    .filter(({status}) => status !== 'root' && status <= maxPorts)
 
   ns.tprint(`INFO targetting ${targets.length} hosts`)
+  //ns.tprint(jisn`INFO targetting ${targets}`)
 
-  targets.forEach(async host => {
-    switch(host.status) {
-      case 5: if(hackingLevel > 750) ns.tprint(`WARN squeald ${host.host}: ` + await ns.sqlinject(host.host))
-      case 4: if(hackingLevel > 500) ns.tprint(`WARN wormed ${host.host}: ` + await ns.httpworm(host.host))
-      case 3: if(hackingLevel > 250) ns.tprint(`WARN smptd ${host.host}: ` + await ns.relaysmtp(host.host))
-      case 2: if(hackingLevel > 100) ns.tprint(`WARN ftpd ${host.host}: ` + await ns.ftpcrack(host.host))
-      case 1: if(hackingLevel > 10) ns.tprint(`WARN brutd ${host.host}: ` + await ns.brutessh(host.host))
-      case 0:
-      case 'nukable':
-        ns.tprint(`WARN nukin ${host.host}: ` + await ns.nuke(host.host))
-        break
-      default: ns.tprint(jisn`ERROR huh? ${host}`)
-    }
-  })
+  const availableTools = tools(ns).slice(-maxPorts).concat(ns.nuke)
 
-  ns.tprint(`INFO done`)
+  const results = await Promise.all(targets.map(async ({ host }) =>
+    (await availableTools.reduce(async (results, tool) => (await results).concat(await tool(host)), [])).map(Number)
+  ))
+
+  ns.tprint(jisn`INFO done ${results}`)
 }
 

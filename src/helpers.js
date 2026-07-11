@@ -18,7 +18,7 @@ export const jisn = (tt, ...xx) =>
     .filter(Boolean)
     .join('')
 
-export const toColumns = list => {
-  const colWidth = (list.reduce((maxLength, text) => Math.max(maxLength, text.length), 0) + 20) & 0xffc
-  return list.map(text => text + ' '.repeat(colWidth - text.length)).join('')
+export const toColumns = (list, whitespace = 20) => {
+  const colWidth = (list.reduce((maxLength, text) => Math.max(maxLength, text.length), 0) + whitespace) & 0xfff
+  return list.map(text => text.padEnd(colWidth, ' ')).join('')
 }

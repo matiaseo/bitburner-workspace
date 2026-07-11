@@ -5,7 +5,7 @@ import { scan } from './scanner.js'
 export function main(ns, target) {
   const hostTree = scan(ns, 32)
   const hosts = flatten(hostTree)
-  const foundHost = hosts.find(({ host }) => host === (target ?? ns.args[0]))
+  const foundHost = hosts.find(({ host }) => host.includes(target ?? ns.args[0]))
 
   ns.tprint(jisn`WARN target ${foundHost ? '' : 'not '}found = ${foundHost}`)
 
