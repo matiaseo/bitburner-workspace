@@ -1,8 +1,9 @@
 import { flatten, selectTop, jisn } from './helpers.js'
 import { scan } from './scanner.js'
+import { deploy } from "./utils.js"
 
 const stealer = 'steal.js'
-const overlap = 10
+const overlap = 14
 
 /** @param {NS} ns */
 const getThreads = (ns, host) =>
