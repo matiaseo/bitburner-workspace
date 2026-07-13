@@ -9,10 +9,18 @@ const allWeakSec = allCores.map(c=>.05+.003125*(c-1))
 export const getWeakSecurity = coreCount => allWeakSec[coreCount-1]
 const growSecurity = .004//ns.growthAnalyzeSecurity(1) // .004 * thread
 const hackSecurity = .002//ns.hackAnalyzeSecurity(1) // .002*thread
-const targetPercent = .1 // 10%
+const maxTargetPercent = .2 // 20%
+const minTargetPercent = .02 // 5%
+const calcPercent = ({ level }) =>
+  Math.max(Math.min(.2*(1-level/120), maxTargetPercent), minTargetPercent)
+const weakToGrow = allWeakSec.map(cs => cs/growSecurity)
+const weakToHack = allWeakSec.map(cs => cs/hackSecurity)
+const byCores = cores => (_,i)=>cores.includes(i+1)
+const scale = n => x => x * n
+const dotProduct = ns => (x, i) => x * n[i]
 
 /** @param {NS} ns */
-export const getBatchData = (ns, target, cores=allCores) => {
+export const getBatchData = (ns, target, cores=allCores, targetPercent=calcPercent(target)) => {
   const { host } = target
   const hackTime = ns.getHackTime(host)^0
   const growTime = ns.getGrowTime(host)^0
@@ -20,13 +28,14 @@ export const getBatchData = (ns, target, cores=allCores) => {
 
   const hackChance = ns.hackAnalyzeChance(host)
   const hackAmount = ns.hackAnalyze(host)
+
   const hackPerThread = hackAmount * hackChance
   const hackThreads = Math.max(Math.floor(targetPercent / hackPerThread), 1)
+
   const growTargetAmount = 1/(hackThreads*hackPerThread)
   const growThreads = cores.map(
       cs => ns.growthAnalyze(host, growTargetAmount, cs)
     ).map(Math.ceil)
-  const weakSecurity = allWeakSec.filter((_,i)=>cores.include(i+1))
 
   // Get times
   const longest = Math.max(hackTime, growTime, weakTime)
@@ -36,17 +45,25 @@ export const getBatchData = (ns, target, cores=allCores) => {
     longest - growTime + 10,
     longest - weakTime + 15
   ]
-  const weakToGrow = weakSecurity.map(cs => cs/growSecurity)
-  const weakToHack = weakSecurity.map(cs => cs/hackSecurity)
+
+  const ratios = {
+    weakToGrow: weakToGrow.filter(byCores(cores)),
+    weakToHack: weakToHack.filter(byCores(cores))
+  }
+
+  const batch = [
+    { action: 'hack', offset: startTimes[0], threads: hackThreads },
+    { action: 'weak', offset: startTimes[1], threads: ratios.weakToHack.map(weakEffect => Math.ceil(hackThreads / weakEffect)) },
+    { action: 'grow', offset: startTimes[2], threads: growThreads },
+    { action: 'weak', offset: startTimes[3], threads: ratios.weakToGrow.map((weakEffect, i) => Math.ceil(growThreads[i] / weakEffect)) }
+  ]
 
   return {
     startTimes,
-    ratios: {
-      weakToGrow,
-      weakToHack
-    },
+    ratios,
     hackThreads,
-    growThreads
+    growThreads,
+    batch
   }
 }
 

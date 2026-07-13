@@ -1,6 +1,6 @@
 import { flatten, selectTop, jisn } from './helpers.js'
 import { scan } from './scanner.js'
-import { deploy } from "./utils.js"
+import { deploy, getBatchData } from "./utils.js"
 
 const stealer = 'steal.js'
 const overlap = 14
@@ -36,14 +36,16 @@ export function main(ns) {
 
   ns.tprint(jisn`INFO targetting ${targets.length} hosts = ${targets} with botnet=[${botnet.length}]${botnet.map(({ host, maxRam, cpuCores }) => `${cpuCores.toString().padStart(2, ' ')} ${host} ${maxRam} ${cpuCores >= threshold ? 'wegw' : 'h'}`).toSorted().join(', ')} thr=${threshold}`)
 
-  const bots = botnet.reduce(categorizeBots(threshold), { hack: [], wegw: [] })
-  ns.tprint(`INFO\nhack=${JSON.stringify(getResources(bots.hack))}\nwegw=${JSON.stringify(getResources(bots.wegw))}`)
+  const cbots = botnet.reduce(categorizeBots(threshold), { hack: [], wegw: [] })
+  ns.tprint(`INFO\nhack=${JSON.stringify(getResources(cbots.hack))}\nwegw=${JSON.stringify(getResources(cbots.wegw))}`)
   // start hacking scripts
   const botsPerTarget = botnet.length / targets.length
   targets.forEach((target, index) => {
     const bots = botnet.slice(index * botsPerTarget, (1+index) * botsPerTarget)
     ns.tprint(`ERROR ${target.host} ${bots.filter((bot, index, {length}) => !index || index === length-1).map(bot=>bot.host).join('...')} # ${bots.length}`)
     const { host, moneyMax, minDifficulty } = target
+    const batchData = getBatchData(ns, target, Array.from(new Set(cbots.wegw.map(({cpuCores})=>cpuCores))))
+    ns.tprint(jisn`WARN batch = ${batchData}`)
     // ns.tprint(jisn`ERROR execd ${bots.map(bot => `${bot.host}[${ns.exec(...getExecParams(ns, bot), host, moneyMax, minDifficulty)}]`)}`)
   })
 }
