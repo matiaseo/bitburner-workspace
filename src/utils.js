@@ -17,7 +17,8 @@ const weakToGrow = allWeakSec.map(cs => cs/growSecurity)
 const weakToHack = allWeakSec.map(cs => cs/hackSecurity)
 const byCores = cores => (_,i)=>cores.includes(i+1)
 const scale = n => x => x * n
-const dotProduct = ns => (x, i) => x * n[i]
+const dotProduct = v => (x, i) => x * v[i]
+const addVector = scale => (x, i) => x + (scale[i] ?? scale)
 
 /** @param {NS} ns */
 export const getBatchData = (ns, target, cores=allCores, targetPercent=calcPercent(target)) => {
@@ -33,6 +34,7 @@ export const getBatchData = (ns, target, cores=allCores, targetPercent=calcPerce
   const hackThreads = Math.max(Math.floor(targetPercent / hackPerThread), 1)
 
   const growTargetAmount = 1/(hackThreads*hackPerThread)
+  ns.tprint('ERROR cores = '+cores.join(','))
   const growThreads = cores.map(
       cs => ns.growthAnalyze(host, growTargetAmount, cs)
     ).map(Math.ceil)
@@ -58,12 +60,22 @@ export const getBatchData = (ns, target, cores=allCores, targetPercent=calcPerce
     { action: 'weak', offset: startTimes[3], threads: ratios.weakToGrow.map((weakEffect, i) => Math.ceil(growThreads[i] / weakEffect)) }
   ]
 
+ const totalThreads = batch.reduce((total, {threads}) =>
+      total.map(addVector(threads))
+    , cores.slice().fill(0))
+
+ const wegwThreads = batch.slice(1).reduce((total, {threads}) =>
+      total.map(addVector(threads))
+    , cores.slice().fill(0))
+
   return {
     startTimes,
     ratios,
     hackThreads,
     growThreads,
-    batch
+    batch,
+    totalThreads,
+    wegwThreads
   }
 }
 
