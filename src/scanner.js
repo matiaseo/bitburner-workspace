@@ -1,3 +1,5 @@
+import { compactArrays, deformat } from "./helpers.js"
+import { getBatchData } from "./utils.js";
 
 const usefulInfo = [
   'requiredHackingSkill',
@@ -48,6 +50,11 @@ const getUsefulValues = (ns, host) => {
   const growSecurity = ns.growthAnalyzeSecurity(1) // .004 * thread
   const weakSecurity = ns.weakenAnalyze(1) //(.003125*(cpu-1)+.05) * thread
 
+  const { '$/s': perSecond, '$/GB': perGB, length: attackTime, totalRam } = moneyMax && hackAmount ? getBatchData(ns, { host, level, moneyMax }, [8]) : {}
+  const rate = perSecond && deformat(perSecond)
+  const efficiency = perGB && deformat(perGB)
+  if(perSecond) ns.tprint('ERROR '+[efficiency,rate,perSecond, perGB, attackTime, totalRam, host, level, moneyMax])
+
   return {
     level,
     minDifficulty,
@@ -64,7 +71,8 @@ const getUsefulValues = (ns, host) => {
     serverGrowth,
     growSecurity,
     weakSecurity,
-    ent: moneyMax * hackChance * hackAmount * serverGrowth / growAmount[1],
+    //ent: moneyMax * hackChance * hackAmount * serverGrowth / growAmount[1],
+    ent: rate * efficiency / totalRam / attackTime,
     cpuCores,
     //info: ns.getServer(host),
     status: hasRoot ? 'root' : numOpenPortsRequired,
@@ -94,11 +102,12 @@ export const scan = (ns, depth, base, path=['home']) =>
 
 /** @param {NS} ns */
 export function main(ns, otherDepth) {
-  const depth = Math.max(+ns.args[0]|0, 1, otherDepth|0)
-  const fileName = `targets${depth}${new Date().toISOString().slice(0,10)}.json`
+  const depth = Math.max(+ns.args[0]|0 || 32, otherDepth|0)
+  const fileName = `targets${depth}.json`
+
   const targets = scan(ns, depth)
   //ns.tprint('INFO ' + JSON.stringify(targets, null, 2))
   ns.tprint('WARN search depth: ' + depth)
-  ns.write(fileName, JSON.stringify(targets, null, 2), 'w')
+  ns.write(fileName, JSON.stringify(compactArrays(targets), null, 2), 'w')
   ns.tprint('WARN wrote file:\t' + fileName)
 }
