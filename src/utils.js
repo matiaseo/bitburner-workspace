@@ -18,27 +18,32 @@ const calcPercent = level =>
 const weakToGrow = allWeakSec.map(([c,w]) => [c, w/growSecurity])
 const weakToHack = allWeakSec.map(([c,w]) => [c, w/hackSecurity])
 const byCores = cores => (_,i)=>cores.includes(i+1)
-const scale = n => x => x * n
-const dotProduct = v => (x, i) => x * v[i]
-const addVector = scale => (x, i) => x + (scale[i] ?? scale)
+//const scale = n => x => x * n
+//const dotProduct = v => (x, i) => x * v[i]
+//const addVector = scale => (x, i) => x + (scale[i] ?? scale)
+
+const normaliseThreads = cores => ({ threads, ...rest }) =>
+  Object.assign({
+      threads: typeof threads !== 'object' ?
+        Object.fromEntries(cores.map(c => [c, threads]))
+        : threads
+    }, rest)
 const addOptimalCores = ({ threads, ...rest }) =>
   Object.assign({threads}, rest, {
-    optimalCores: typeof threads !== 'object' ? '1' :
-      Object.entries(threads)
-        .reduce(([mK, m], [k, t]) => t < m? [k, t] : [mK, m], [0, Infinity])
-        [0]
+    optimalCores: Object.entries(threads).reduce(
+        ([mKs, ms], [k, t]) =>
+        t < ms[0] ? [[k].concat(mKs), [t].concat(ms)] : [mKs, ms]
+      , [[], [Infinity]])
+      [0]
   })
-const addCost = ({ threads, optimalCores, ...rest }) =>
-  Object.assign({}, rest, {
-    threads: typeof threads !== 'object' ? [threads, threads * 1.7] :
-      Object.fromEntries(
-        Object.entries(threads)
-          .map(([cores, threads]) => [cores, [threads, threads * 1.75]])
+const addCost = ({ action, threads, optimalCores, ...rest }) =>
+  Object.assign({ action }, rest, {
+    threads: Object.fromEntries(Object.entries(threads).map(
+        ([cores, threads]) =>
+          [cores, [threads, threads * (action === 'hack' ? 1.7 : 1.75)]])
       ),
     optimalCores,
-    optimalCost: typeof threads !== 'object' ?
-      threads * 1.7
-      : threads[optimalCores] * 1.75
+    optimalCost: threads[optimalCores[0]] * (action === 'hack' ? 1.7 : 1.75)
   })
 
 /** @param {NS} ns */
@@ -85,7 +90,8 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
     { action: 'weak', offset: startTimes[1], threads: hWeakThreads },
     { action: 'grow', offset: startTimes[2], threads: growThreads },
     { action: 'weak', offset: startTimes[3], threads: gWeakThreads }
-  ].map(addOptimalCores)
+  ].map(normaliseThreads(cores))
+    .map(addOptimalCores)
     .map(addCost)
 
   const wegwThreads = Object.fromEntries(batch.slice(1).reduce((total, {threads}) =>

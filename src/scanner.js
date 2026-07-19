@@ -43,17 +43,17 @@ const getUsefulValues = (ns, host) => {
     cpuCores,
     serverGrowth
   } = ns.getServer(host)
-  const hackChance = ns.hackAnalyzeChance(host)
-  const hackAmount = ns.hackAnalyze(host)
-  const hackSecurity = ns.hackAnalyzeSecurity(1) // .002*thread
-  const growAmount = [2,8,12].map(x=>ns.growthAnalyze(host, 1.25, x))
-  const growSecurity = ns.growthAnalyzeSecurity(1) // .004 * thread
-  const weakSecurity = ns.weakenAnalyze(1) //(.003125*(cpu-1)+.05) * thread
+  //const hackChance = ns.hackAnalyzeChance(host)
+  //const hackAmount = ns.hackAnalyze(host)
+  //const hackSecurity = ns.hackAnalyzeSecurity(1) // .002*thread
+  //const growAmount = [2,8,12].map(x=>ns.growthAnalyze(host, 1.25, x))
+  //const growSecurity = ns.growthAnalyzeSecurity(1) // .004 * thread
+  //const weakSecurity = ns.weakenAnalyze(1) //(.003125*(cpu-1)+.05) * thread
 
-  const { '$/s': perSecond, '$/GB': perGB, length: attackTime, totalRam } = moneyMax && hackAmount ? getBatchData(ns, { host, level, moneyMax }, [8]) : {}
-  const rate = perSecond && deformat(perSecond)
-  const efficiency = perGB && deformat(perGB)
-  if(perSecond) ns.tprint('ERROR '+[efficiency,rate,perSecond, perGB, attackTime, totalRam, host, level, moneyMax])
+  //const { '$/s': perSecond, '$/GB': perGB, length: attackTime, totalRam } = moneyMax && hackAmount ? getBatchData(ns, { host, level, moneyMax }, [8]) : {}
+  //const rate = perSecond && deformat(perSecond)
+  //const efficiency = perGB && deformat(perGB)
+  //if(perSecond) ns.tprint('ERROR '+[perSecond, perGB, attackTime, totalRam, host, level, moneyMax])
 
   return {
     level,
@@ -63,16 +63,16 @@ const getUsefulValues = (ns, host) => {
     moneyMax,
     maxRam,
     ramUsed,
-    hackChance,
-    hackAmount,
-    hackSecurity,
-    growAmount,
-    grow8:growAmount[1],
-    serverGrowth,
-    growSecurity,
-    weakSecurity,
+    //hackChance,
+    //hackAmount,
+    //hackSecurity,
+    //growAmount,
+    //grow8:growAmount[1],
+    //serverGrowth,
+    //growSecurity,
+    //weakSecurity,
     //ent: moneyMax * hackChance * hackAmount * serverGrowth / growAmount[1],
-    ent: rate * efficiency / totalRam / attackTime,
+    //ent: rate * efficiency / totalRam / attackTime,
     cpuCores,
     //info: ns.getServer(host),
     status: hasRoot ? 'root' : numOpenPortsRequired,

@@ -4,9 +4,10 @@ export const flatten = hosts =>
 
 // minDifficulty, moneyMax
 export const selectTop = (hosts, count = 10) =>
-  hosts.filter(({ status }) => status === 'root')
+//  hosts.filter(({ status }) => status === 'root')
     //.toSorted((a, b) => b.moneyMax - a.moneyMax || a.minDifficulty - b.minDifficulty)
-    .toSorted((a, b) => b.ent - a.ent)
+  hosts
+    .toSorted((a, b) => b.potential - a.potential)
     .slice(0, count)
 
 export const str = data => JSON.stringify(data, null, 2)
@@ -56,6 +57,8 @@ export const deformat = text =>
       +n * Math.pow(10, 3 * scaleSuffixes.indexOf(scale))
     )
 
+export const multiSort = filters =>
+  (a,b) => filters.reduce((output, [k,s=1]) => output || s*(a[k]-b[k]), 0)
 
 
 
