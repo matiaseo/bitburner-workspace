@@ -57,7 +57,7 @@ export const deformat = text =>
       +n * Math.pow(10, 3 * scaleSuffixes.indexOf(scale))
     )
 
-export const multiSort = filters =>
+export const multiSort = (...filters) =>
   (a,b) => filters.reduce((output, [k,s=1]) => output || s*(a[k]-b[k]), 0)
 
 
