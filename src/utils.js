@@ -11,10 +11,10 @@ export const getWeakSecurity = coreCount => allWeakSec[coreCount-1]
 
 const growSecurity = .004//ns.growthAnalyzeSecurity(1) // .004 * thread
 const hackSecurity = .002//ns.hackAnalyzeSecurity(1) // .002*thread
-const maxTargetPercent = .2 // 20%
-const minTargetPercent = .02 // 5%
-const calcPercent = level =>
-  Math.max(Math.min(.2*(1-level/120), maxTargetPercent), minTargetPercent)
+const maxTargetPercent = .15
+const minTargetPercent = .02
+const calcPercent = (level, hackLevel) =>
+  Math.max(Math.min(maxTargetPercent*(1-level/hackLevel), maxTargetPercent), minTargetPercent)
 const weakToGrow = allWeakSec.map(([c,w]) => [c, w/growSecurity])
 const weakToHack = allWeakSec.map(([c,w]) => [c, w/hackSecurity])
 const byCores = cores => (_,i)=>cores.includes(i+1)
@@ -47,7 +47,7 @@ const addCost = ({ action, threads, optimalCores, ...rest }) =>
   })
 
 /** @param {NS} ns */
-export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delta=5, targetPercent=calcPercent(level)) => {
+export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delta=5, targetPercent=calcPercent(level, ns.getPlayer().skills.hacking)) => {
   const hackTime = ns.getHackTime(host)^0
   const growTime = ns.getGrowTime(host)^0
   const weakTime = ns.getWeakenTime(host)^0
@@ -55,10 +55,17 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
   const hackChance = ns.hackAnalyzeChance(host)
   const hackAmount = ns.hackAnalyze(host)
 
-  const hackPerThread = hackAmount * hackChance
+  const hackPerThread = hackAmount// * hackChance
   const hackThreads = Math.max(Math.floor(targetPercent / hackPerThread), 1)
 
-  const growTargetAmount = 1/(1-hackThreads*hackPerThread)
+  const growTargetAmount = 1/(1-hackThreads*hackAmount)//hackPerThread)
+/*  console.log(hackThreads, ns.hackAnalyzeThreads(host, targetPercent*moneyMax),
+    hackChance*hackAmount*moneyMax*hackThreads,
+    targetPercent/hackAmount,
+    //moneyMax/ns.hackAnalyzeThreads(host, targetPercent*moneyMax),
+    growTargetAmount, targetPercent, 1/(1-targetPercent)
+  )
+*/
   //ns.tprint('ERROR cores = '+cores.join(','))
   //ns.tprint('ERROR grow target = '+ [growTargetAmount, hackAmount, hackChance, targetPercent])
   const growThreads = Object.fromEntries(cores.map(
@@ -86,33 +93,20 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
     ))
 
   const batch = [
-    { action: 'hack', offset: startTimes[0], threads: hackThreads },
-    { action: 'weak', offset: startTimes[1], threads: hWeakThreads },
-    { action: 'grow', offset: startTimes[2], threads: growThreads },
-    { action: 'weak', offset: startTimes[3], threads: gWeakThreads }
+    { action: 'weak', offset: startTimes[1], actIndex: 1, threads: hWeakThreads },
+    { action: 'weak', offset: startTimes[3], actIndex: 3, threads: gWeakThreads },
+    { action: 'grow', offset: startTimes[2], actIndex: 2, threads: growThreads },
+    { action: 'hack', offset: startTimes[0], actIndex: 0, threads: hackThreads }
   ].map(normaliseThreads(cores))
     .map(addOptimalCores)
     .map(addCost)
-
-  const wegwThreads = Object.fromEntries(batch.slice(1).reduce((total, {threads}) =>
-       total.map(([c,t])=>[c,t+threads[c]])
-    , cores.slice().map(c=>[c,0])))
-
-  const totalThreads = Object.fromEntries(Object.entries(wegwThreads)
-    .map(([c, threads]) => [c, threads + hackThreads]))
 
   const batchMoney = hackThreads*hackPerThread*moneyMax
   const totalRam = batch.reduce((total, {optimalCost}) => total+optimalCost, 0)
 
   return {
-    //startTimes,
-    //ratios,
-    //growThreads,
     batch,
-    //hackThreads,
-    //totalThreads,
-    //wegwThreads
-    length: (longest + 3 * delta) / 1000,
+    duration: longest + 3 * delta,
     totalRam,
     $: formatNumber(batchMoney),
     '$/s': formatNumber(1000*batchMoney/(longest+3*delta)),

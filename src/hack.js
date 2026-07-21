@@ -4,8 +4,8 @@ import { scan } from './scanner.js'
 import { deploy, getBatchData } from "./utils.js"
 
 const stealer = 'scripts/steal.js'
-const batchDelta = 200
-const actDelta = 100
+const batchDelta = 150
+const actDelta = 75
 const baseOrchDelay = 1000
 
 /** @param {NS} ns */
@@ -88,7 +88,7 @@ const allocateBatch = (batch, delta, resources, alloc=[]) => {
 }
 
 const addAllocation = (ns, cores, botnetRes, delta=batchDelta) => target => {
-  const { batch: rawB, '$/s':flow } = getBatchData(ns, target, cores, actDelta)
+  const { batch: rawB, '$/s':flow, duration } = getBatchData(ns, target, cores, actDelta)
   const batch = rawB.map(({threads, optimalCores, ...act}) =>
     Object.assign({
       orderedThreads: getOrderedThreads(threads, optimalCores)
@@ -96,11 +96,14 @@ const addAllocation = (ns, cores, botnetRes, delta=batchDelta) => target => {
   const batchFit = [batch, batch.toReversed()]
     .map(batch => allocateBatch(batch, delta, botnetRes))
     .reduce((fw, rev) => rev.length > fw.length ? rev : fw)
-  const potential = deformat(flow) * batchFit.length>>2
+  const concurrency = batchFit.length>>2
+  const potential = deformat(flow) * concurrency
   return {
     ...target,
     potential,
+    concurrency,
     '$/s': formatNumber(potential),
+    duration,
     getAllocation: () => batchFit
   }
 }
@@ -110,29 +113,44 @@ const addAllocation = (ns, cores, botnetRes, delta=batchDelta) => target => {
 const pollStatus = async (ns, port=1) => {
   while(1) {
     await ns.asleep(1000)
-    for(let portMessage; portMessage = ns.readPort(port), !portMessage.startsWith('N');)
-      ns.tprint(portMessage)
+    for(let portMessage; portMessage = ns.readPort(port), !portMessage.startsWith('N');) {
+      const index = +portMessage.charAt(0)
+      ns.tprint(portMessage.slice(1)+'\t'+['\t\\ ','\t |','\t /','\t| '][index].repeat(4))
+    }
   }
 }
 
 /** @param {NS} ns */
-const orchid = async (ns, hitlist) => {
-  const [{host:target, getAllocation}] = hitlist
-  const port = 1
-  const batches = getAllocation().toSorted(multiSort(['offset']))
+const traitor = async (ns, batches, target, duration, port=1) => {
   const startTime = performance.now() + baseOrchDelay
-  console.log(startTime, batches, batches[0])
-  while(1)
-    for(let act,i=0; act = batches[i];) {
-      //pollStatus(ns, port)
-      const delay = act.offset - (performance.now() - startTime)
-      //console.log(act, delay)
-      if(delay <= 0) {
-        ns.exec(stealer, act.host, act.threads, act.action, target, port)
-        i++
-        //if(delay < -10) console.error('drift='+delay)
-      } else await ns.asleep(Math.max(10,Math.floor(delay)))
-    }
+  if(![target, batches, duration, startTime].every(Boolean))
+    return ns.tprint(jssn`ERROR missing=${[target, batches, duration, startTime]}`)
+  for(let act,i=0; act = batches[i];) {
+    const delay = act.offset - (performance.now() - startTime)
+    if(delay <= 0) {
+      ns.exec(stealer, act.host, act.threads, act.action, target, port, act.actIndex)
+      i++
+      if(delay < -actDelta) console.error('drift='+delay)
+      await ns.asleep(actDelta>>1)
+    } else console.log('will sleep',delay)||await ns.asleep(Math.max(10,Math.floor(delay*.9)))
+  }
+  const ncbDelay = Math.max(1, Math.round(duration - (performance.now() - startTime)))
+  ns.tprint('WARN sleeping before next concurrent batches '+ncbDelay/1000+'s')
+  await ns.asleep(ncbDelay)
+}
+
+/** @param {NS} ns */
+const orchids = async (ns, hitlist) => {
+  const [{host:target, getAllocation, duration, moneyMax, minDifficulty}] = hitlist
+  const batches = getAllocation().toSorted(multiSort(['offset']))
+  while(ns.getServerMoneyAvailable(target) < moneyMax
+    || ns.getServerSecurityLevel(target) > minDifficulty) {
+    ns.tprint(`ERROR needs to be topped:
+      ${ns.getServerMoneyAvailable(target)} < ${moneyMax}
+      ${ns.getServerSecurityLevel(target)} > ${minDifficulty}`)
+    await traitor(ns, batches.filter(({action})=>action!=='hack'), target, duration)
+  }
+  while(1) await traitor(ns, batches, target, duration)
 }
 
 /** @param {NS} ns */
@@ -170,6 +188,6 @@ export async function main(ns) {
 
   ns.tprint(jisn`INFO targetting ${targets.length} hosts = ${targets} with botnet size=[${botnet.length}]`)//${botnet.map(({ host, maxRam, cpuCores }) => `${cpuCores.toString().padStart(2, ' ')} ${host} ${maxRam} ${cpuCores >= threshold ? 'wegw' : 'h'}`).toSorted().join(', ')} thr=${threshold}`)
 
-  return orchid(ns, targets)
+  return orchids(ns, targets)
 }
 

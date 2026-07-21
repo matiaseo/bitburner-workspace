@@ -13,13 +13,14 @@ export async function main(ns) {
       hackingLevel >= level && moneyMax
         && ns.getServerSecurityLevel(host) > minDifficulty
           && ns.getServerMoneyAvailable(host) < moneyMax
-    )
-
+    ).filter(Boolean)
+    if(!targets.length) return ns.tprint('ERROR no targets')
     const threads = Math.floor(freeRam / ram)
     if(threads)
       targets.forEach(({ host, moneyMax, minDifficulty:securityMin }) =>
         ns.tprint('INFO starting '+
-          ns.run('scripts/topup.js', { ramOverride: ram, threads }, host, moneyMax, securityMin))
+          ns.run('scripts/topup.js', { ramOverride: ram, threads },
+            host, moneyMax, securityMin))
       )
     const botnet = hosts.filter(({ status, maxRam }) => status === 'root' && maxRam>ram)
     botnet.forEach(({ host }) => ns.scp('scripts/top.js', host))
@@ -27,8 +28,10 @@ export async function main(ns) {
       let capacity = Math.floor(maxRam/ram)
       const threads = Math.max(Math.floor(capacity/targets.length), 1)
       while(capacity--) {
+        console.log(targets, capacity)
         const { host, moneyMax, minDifficulty } = targets[capacity%targets.length]
-        ns.exec('scripts/top.js', botHost, { ramOverride: ram, threads }, host, moneyMax, minDifficulty)
+        ns.exec('scripts/top.js', botHost, { ramOverride: ram, threads },
+          host, moneyMax, minDifficulty)
       }
     })
   } else {
