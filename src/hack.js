@@ -4,7 +4,7 @@ import { scan } from './scanner.js'
 import { deploy, getBatchData } from "./utils.js"
 
 const stealer = 'scripts/steal.js'
-const batchDelta = 150
+const batchDelta = 500
 const actDelta = 75
 const baseOrchDelay = 1000
 
@@ -75,7 +75,7 @@ const setOffset = (delta, index, delay=delta*index) => ({offset, ...act}) =>
 
 const allocateBatch = (batch, delta, resources, alloc=[]) => {
   const [leftovers, nextAlloc] = batch
-    .map(setOffset(delta, alloc.length))
+    .map(setOffset(delta, alloc.length>>2))
     .reduce(([resources, alloActs], { orderedThreads, ...act }) =>
         resources &&
           deductCost(orderedThreads, resources, act, alloActs)
@@ -87,7 +87,8 @@ const allocateBatch = (batch, delta, resources, alloc=[]) => {
   return !leftovers? newAlloc : allocateBatch(batch, delta, leftovers, newAlloc)
 }
 
-const addAllocation = (ns, cores, botnetRes, delta=batchDelta) => target => {
+const addAllocation = (ns, cores, botnetRes, delta=batchDelta) =>
+  target => {
   const { batch: rawB, '$/s':flow, duration } = getBatchData(ns, target, cores, actDelta)
   const batch = rawB.map(({threads, optimalCores, ...act}) =>
     Object.assign({
@@ -113,9 +114,11 @@ const addAllocation = (ns, cores, botnetRes, delta=batchDelta) => target => {
 const pollStatus = async (ns, port=1) => {
   while(1) {
     await ns.asleep(1000)
-    for(let portMessage; portMessage = ns.readPort(port), !portMessage.startsWith('N');) {
-      const index = +portMessage.charAt(0)
-      ns.tprint(portMessage.slice(1)+'\t'+['\t\\ ','\t |','\t /','\t| '][index].repeat(4))
+    for(let portMessage; portMessage=ns.readPort(port), !portMessage.startsWith('N');) {
+      const isEnd = portMessage.includes('end')
+      const index = [4,13,10,3][+portMessage.charAt(0)]
+      const draw = ['\t\\ ','\t |','\t /','\t| '][isEnd ? index&3 : index>>2]
+      ns.tprint(portMessage.slice(1)+'\t'+draw)
     }
   }
 }
@@ -127,14 +130,16 @@ const traitor = async (ns, batches, target, duration, port=1) => {
     return ns.tprint(jssn`ERROR missing=${[target, batches, duration, startTime]}`)
   for(let act,i=0; act = batches[i];) {
     const delay = act.offset - (performance.now() - startTime)
+    let skipHack
     if(delay <= 0) {
-      ns.exec(stealer, act.host, act.threads, act.action, target, port, act.actIndex)
+      if(!skipHack || act.action !== 'hack')
+        ns.exec(stealer, act.host, act.threads, act.action, target, port, act.actIndex)
       i++
-      if(delay < -actDelta) console.error('drift='+delay)
+      if(delay < -actDelta) skipHack = console.error('drift='+delay)||true
       await ns.asleep(actDelta>>1)
-    } else console.log('will sleep',delay)||await ns.asleep(Math.max(10,Math.floor(delay*.9)))
+    } else await ns.asleep(Math.max(1,Math.floor(delay>>1)))
   }
-  const ncbDelay = Math.max(1, Math.round(duration - (performance.now() - startTime)))
+  const ncbDelay = Math.max(1, Math.round(duration - (performance.now() - startTime) + actDelta))
   ns.tprint('WARN sleeping before next concurrent batches '+ncbDelay/1000+'s')
   await ns.asleep(ncbDelay)
 }
@@ -143,14 +148,20 @@ const traitor = async (ns, batches, target, duration, port=1) => {
 const orchids = async (ns, hitlist) => {
   const [{host:target, getAllocation, duration, moneyMax, minDifficulty}] = hitlist
   const batches = getAllocation().toSorted(multiSort(['offset']))
-  while(ns.getServerMoneyAvailable(target) < moneyMax
-    || ns.getServerSecurityLevel(target) > minDifficulty) {
-    ns.tprint(`ERROR needs to be topped:
-      ${ns.getServerMoneyAvailable(target)} < ${moneyMax}
-      ${ns.getServerSecurityLevel(target)} > ${minDifficulty}`)
-    await traitor(ns, batches.filter(({action})=>action!=='hack'), target, duration)
+  while(2) {
+    while(ns.getServerMoneyAvailable(target) < moneyMax
+      || ns.getServerSecurityLevel(target) > minDifficulty) {
+      ns.tprint(`ERROR needs to be topped:
+        ${ns.getServerMoneyAvailable(target)} < ${moneyMax}
+        ${ns.getServerSecurityLevel(target)} > ${minDifficulty}`)
+      const remove = ['hack'].concat(
+        ns.getServerMoneyAvailable(target) === moneyMax ? 'grow' : [])
+      const filteredBatches = batches
+        .filter(({action})=>!remove.includes(action))
+      await traitor(ns, filteredBatches, target, duration)
+    }
+    await traitor(ns, batches, target, duration)
   }
-  while(1) await traitor(ns, batches, target, duration)
 }
 
 /** @param {NS} ns */
