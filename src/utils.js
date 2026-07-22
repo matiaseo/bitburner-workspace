@@ -1,6 +1,13 @@
 import { formatNumber } from './helpers.js'
 
 /** @param {NS} ns */
+export const killPrevious = ns =>
+  [].concat(ns.getRunningScript(ns.getScriptName()) ?? [])
+    .map(s => s.pid)
+    .filter(id => id !== ns.pid)
+    .forEach(id => ns.kill(id))
+
+/** @param {NS} ns */
 export const deploy = (ns, scripts, hosts) =>
   [].concat(hosts).forEach(({ host }) => ns.scp(scripts, host))
 
@@ -58,7 +65,7 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
   const hackPerThread = hackAmount// * hackChance
   const hackThreads = Math.max(Math.floor(targetPercent / hackPerThread), 1)
 
-  const growTargetAmount = 1/(1-hackThreads*hackAmount)//hackPerThread)
+  const growTargetAmount = 1.02/(1-hackThreads*hackAmount)//hackPerThread)
 /*  console.log(hackThreads, ns.hackAnalyzeThreads(host, targetPercent*moneyMax),
     hackChance*hackAmount*moneyMax*hackThreads,
     targetPercent/hackAmount,
@@ -75,28 +82,31 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
   // Get times
   const longest = Math.max(hackTime, growTime, weakTime)
   const startTimes = [
-    longest - hackTime - delta,
-    longest - weakTime,
-    longest - growTime + delta,
-    longest - weakTime + 2*delta
+    longest -   delta - hackTime,
+    longest           - weakTime,
+    longest +   delta - growTime,
+    longest + 2*delta - weakTime,
+    longest + 3*delta
   ]
 
   const ratios = {
     weakToGrow: weakToGrow.filter(byCores(cores)),
     weakToHack: weakToHack.filter(byCores(cores))
   }
+  console.log(ratios, hackThreads, growThreads)
   const hWeakThreads = Object.fromEntries(ratios.weakToHack.map(
       ([c, weakEffect]) => [c, Math.ceil(hackThreads / weakEffect)]
     ))
   const gWeakThreads = Object.fromEntries(ratios.weakToGrow.map(
-      ([c, weakEffect]) => [c, Math.ceil(growThreads[c] / weakEffect)]
+      ([c, weakEffect]) => [c, 1+Math.ceil(growThreads[c] / weakEffect)]
     ))
 
   const batch = [
     { action: 'weak', offset: startTimes[1], actIndex: 1, threads: hWeakThreads },
     { action: 'weak', offset: startTimes[3], actIndex: 3, threads: gWeakThreads },
     { action: 'grow', offset: startTimes[2], actIndex: 2, threads: growThreads },
-    { action: 'hack', offset: startTimes[0], actIndex: 0, threads: hackThreads }
+    { action: 'hack', offset: startTimes[0], actIndex: 0, threads: hackThreads },
+    { action: 'check', offset: startTimes[4], actIndex: 4, threads: 0 }
   ].map(normaliseThreads(cores))
     .map(addOptimalCores)
     .map(addCost)
