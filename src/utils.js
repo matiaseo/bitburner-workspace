@@ -18,7 +18,7 @@ export const getWeakSecurity = coreCount => allWeakSec[coreCount-1]
 
 const growSecurity = .004//ns.growthAnalyzeSecurity(1) // .004 * thread
 const hackSecurity = .002//ns.hackAnalyzeSecurity(1) // .002*thread
-const maxTargetPercent = .15
+const maxTargetPercent = .1
 const minTargetPercent = .02
 const calcPercent = (level, hackLevel) =>
   Math.max(Math.min(maxTargetPercent*(1-level/hackLevel), maxTargetPercent), minTargetPercent)
@@ -86,7 +86,7 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
     longest           - weakTime,
     longest +   delta - growTime,
     longest + 2*delta - weakTime,
-    longest + 3*delta
+//    longest + 3*delta
   ]
 
   const ratios = {
@@ -98,15 +98,14 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
       ([c, weakEffect]) => [c, Math.ceil(hackThreads / weakEffect)]
     ))
   const gWeakThreads = Object.fromEntries(ratios.weakToGrow.map(
-      ([c, weakEffect]) => [c, 1+Math.ceil(growThreads[c] / weakEffect)]
+      ([c, weakEffect]) => [c, Math.ceil(growThreads[1] / weakEffect)]
     ))
 
   const batch = [
     { action: 'weak', offset: startTimes[1], actIndex: 1, threads: hWeakThreads },
     { action: 'weak', offset: startTimes[3], actIndex: 3, threads: gWeakThreads },
     { action: 'grow', offset: startTimes[2], actIndex: 2, threads: growThreads },
-    { action: 'hack', offset: startTimes[0], actIndex: 0, threads: hackThreads },
-    { action: 'check', offset: startTimes[4], actIndex: 4, threads: 0 }
+    { action: 'hack', offset: startTimes[0], actIndex: 0, threads: hackThreads }
   ].map(normaliseThreads(cores))
     .map(addOptimalCores)
     .map(addCost)
@@ -116,10 +115,10 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
 
   return {
     batch,
-    duration: longest + 3 * delta,
+    duration: longest + 2 * delta,
     totalRam,
     $: formatNumber(batchMoney),
-    '$/s': formatNumber(1000*batchMoney/(longest+3*delta)),
+    '$/s': formatNumber(1000*batchMoney/(longest+2*delta)),
     '$/GB': formatNumber(batchMoney/totalRam)
   }
 }

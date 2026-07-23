@@ -75,7 +75,7 @@ const setOffset = (delta, index, delay=delta*index) => ({offset, ...act}) =>
 
 const allocateBatch = (batch, delta, resources, alloc=[]) => {
   const [leftovers, nextAlloc] = batch
-    .map(setOffset(delta, alloc.length/batch.length))
+    .map(setOffset(delta, alloc.length>>2))
     .reduce(([resources, alloActs], { orderedThreads, ...act }) =>
         resources &&
           deductCost(orderedThreads, resources, act, alloActs)
@@ -97,8 +97,13 @@ const addAllocation = (ns, cores, botnetRes, delta=batchDelta) =>
   const batchFit = [batch, batch.toReversed()]
     .map(batch => allocateBatch(batch, delta, botnetRes))
     .reduce((fw, rev) => rev.length > fw.length ? rev : fw)
-  const concurrency = batchFit.length>>2
+    .concat({
+      action: 'check',
+      offset: duration + actDelta + batchDelta*(batch.length>>2)
+    })
+  const concurrency = (batchFit.length-1)>>2
   const potential = deformat(flow) * concurrency
+  console.log(potential, concurrency, batchFit)
   return {
     ...target,
     potential,
@@ -121,7 +126,7 @@ const traitor = async (ns, batches, {target,moneyMax,minDifficulty}, duration, p
       if(act.action === 'check') {
         const check = (ns.getServerMoneyAvailable(target) < moneyMax ||
                        ns.getServerSecurityLevel(target) > minDifficulty)
-        console.log('checking', check)
+        ns.tprint('checking', check)
         if(check) break
       } else if(!skipHack || act.action !== 'hack')
         ns.exec(stealer,act.host,act.threads,act.action,target,port,act.actIndex)
@@ -146,10 +151,10 @@ const orchids = async (ns, hitlist) => {
         ${ns.getServerMoneyAvailable(target)} < ${moneyMax}
         ${ns.getServerSecurityLevel(target)} > ${minDifficulty}`)
       const remove = [].concat(ns.getServerMoneyAvailable(target) === moneyMax ? 'grow' : [])
-      const modifiedBatches = getAllocation().slice(0,10)
+      const modifiedBatches = getAllocation().slice(0,4)
         .toSorted(multiSort(['offset']))
         .map(b => b.action !== 'hack' ? b
-          : Object.assign({}, b, { action: 'weak', offset: 0 })
+          : Object.assign({}, b, { action: 'weak', offset: -baseOrchDelay })
       ).filter(({action})=>!remove.includes(action))
       await traitor(ns, modifiedBatches, {target,moneyMax,minDifficulty}, duration)
     }

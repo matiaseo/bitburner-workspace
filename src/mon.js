@@ -1,4 +1,5 @@
 import { killPrevious } from './utils.js'
+const ts = ()=>new Date().toISOString().slice(11,19)+'] '
 
 /** @param {NS} ns */
 export const main = async ns => {
@@ -9,16 +10,16 @@ export const main = async ns => {
   const rs = new Set()
   while(1) {
     await ns.asleep(pollPeriod)
-    for(let portMessage; portMessage=ns.readPort(port), !portMessage.startsWith('N');) {
-      const isEnd = portMessage.includes('end')
-      const index = [4,13,10,3][+portMessage.charAt(0)]
+    for(let message; message=ns.readPort(port), !message.startsWith('N');) {
+      const isEnd = message.includes('end')
+      const index = [4,13,10,3][+message.charAt(0)]
       const draw = [' \\ ','  |',' / ','|  '][isEnd ? index&3 : index>>2].repeat(2)
-      ;(!isEnd ? console.debug : ns.tprint)(portMessage.slice(1)+'\t'+draw)
+      ;(!isEnd ? console.debug : ns.tprint)(ts()+message.slice(1)+'\t'+draw)
     }
     const recent = ns.getRecentScripts()
       .filter(({ pid, filename }) =>
         !rs.has(pid) && filename !== ns.getScriptName())
     recent.forEach(({pid}) => rs.add(pid))
-    recent.forEach(({logs, pid}) => console.log(`${pid}\n${logs.join('\n')}`))
+    recent.forEach(({logs, pid}) => console.log(ts()+`${pid}\n${logs.join('\n')}`))
   }
 }
