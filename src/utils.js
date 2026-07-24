@@ -18,7 +18,7 @@ export const getWeakSecurity = coreCount => allWeakSec[coreCount-1]
 
 const growSecurity = .004//ns.growthAnalyzeSecurity(1) // .004 * thread
 const hackSecurity = .002//ns.hackAnalyzeSecurity(1) // .002*thread
-const maxTargetPercent = .1
+const maxTargetPercent = .15
 const minTargetPercent = .02
 const calcPercent = (level, hackLevel) =>
   Math.max(Math.min(maxTargetPercent*(1-level/hackLevel), maxTargetPercent), minTargetPercent)
@@ -59,13 +59,13 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
   const growTime = ns.getGrowTime(host)^0
   const weakTime = ns.getWeakenTime(host)^0
 
-  const hackChance = ns.hackAnalyzeChance(host)
+  //const hackChance = ns.hackAnalyzeChance(host)
   const hackAmount = ns.hackAnalyze(host)
 
   const hackPerThread = hackAmount// * hackChance
   const hackThreads = Math.max(Math.floor(targetPercent / hackPerThread), 1)
 
-  const growTargetAmount = 1.02/(1-hackThreads*hackAmount)//hackPerThread)
+  const growTargetAmount = 1/(1-hackThreads*hackAmount)//hackPerThread)
 /*  console.log(hackThreads, ns.hackAnalyzeThreads(host, targetPercent*moneyMax),
     hackChance*hackAmount*moneyMax*hackThreads,
     targetPercent/hackAmount,
@@ -82,18 +82,17 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
   // Get times
   const longest = Math.max(hackTime, growTime, weakTime)
   const startTimes = [
-    longest -   delta - hackTime,
-    longest           - weakTime,
-    longest +   delta - growTime,
-    longest + 2*delta - weakTime,
-//    longest + 3*delta
+    longest           - hackTime,
+    longest +   delta - weakTime,
+    longest + 2*delta - growTime,
+    longest + 3*delta - weakTime,
   ]
 
   const ratios = {
     weakToGrow: weakToGrow.filter(byCores(cores)),
     weakToHack: weakToHack.filter(byCores(cores))
   }
-  console.log(ratios, hackThreads, growThreads)
+  //console.log(ratios, hackThreads, growThreads)
   const hWeakThreads = Object.fromEntries(ratios.weakToHack.map(
       ([c, weakEffect]) => [c, Math.ceil(hackThreads / weakEffect)]
     ))
@@ -115,10 +114,10 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
 
   return {
     batch,
-    duration: longest + 2 * delta,
+    duration: longest + 3 * delta,
     totalRam,
     $: formatNumber(batchMoney),
-    '$/s': formatNumber(1000*batchMoney/(longest+2*delta)),
+    '$/s': formatNumber(1000*batchMoney/(longest+3*delta)),
     '$/GB': formatNumber(batchMoney/totalRam)
   }
 }

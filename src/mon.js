@@ -1,5 +1,7 @@
+import { ts } from './helpers.js'
 import { killPrevious } from './utils.js'
-const ts = ()=>new Date().toISOString().slice(11,19)+'] '
+
+const gSum = logs => logs.slice(0,-1).join(' ')
 
 /** @param {NS} ns */
 export const main = async ns => {
@@ -20,6 +22,6 @@ export const main = async ns => {
       .filter(({ pid, filename }) =>
         !rs.has(pid) && filename !== ns.getScriptName())
     recent.forEach(({pid}) => rs.add(pid))
-    recent.forEach(({logs, pid}) => console.log(ts()+`${pid}\n${logs.join('\n')}`))
+    recent.forEach(({logs, pid}) => console.log(ts()+`${pid} ${gSum(logs)}`))
   }
 }

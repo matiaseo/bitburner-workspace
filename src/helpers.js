@@ -1,4 +1,6 @@
 
+export const ts = ()=>new Date().toISOString().slice(11,19)+'] '
+
 export const flatten = hosts =>
   hosts?.flatMap(({ connected, ...host }) => [host].concat(flatten(connected))) ?? []
 
