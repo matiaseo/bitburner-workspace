@@ -1,13 +1,14 @@
 import { flatten, selectTop, jisn, jssn,
   multiSort, deformat, formatNumber, ts } from './helpers.js'
 import { scan } from './scanner.js'
-import { deploy, getBatchData, killPrevious, getWeakSecurity } from "./utils.js"
+import { deploy, getBatchData, killPrevious, respawn, getWeakSecurity } from "./utils.js"
 
 const stealer = 'scripts/steal.js'
-const actDelta = 128
+const actDelta = 256
 const checkWindow = actDelta*8
 const batchDelta = actDelta*4 + checkWindow
 const baseOrchDelay = actDelta >> 1
+const failThreshold = 4
 
 /** @param {NS} ns */
 const getThreads = (ns, host) =>
@@ -177,7 +178,7 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
     .filter(({cap})=>cap)
     .reduce(([bots, pending], {host, cap}) =>
         pending > 0 ?
-          [bots.concat({host,threads:cap}), pending - cap]
+          [bots.concat({host,threads:Math.min(cap, pending)}), pending - cap]
           : [bots, 0]
       , [[], esThreads])[0]
 
@@ -192,25 +193,30 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
     await ns.asleep(syncTime)
     execGrow(ns, growThreads, host)
   }
-  const ncbDelay = gAlign(duration, startTime)
-  if(ncbDelay) {
-    ns.tprint('WARN'+ts()+'sleep before next batch '+ncbDelay/1000+'s')
-    await ns.asleep(ncbDelay)
-  }
+//  const ncbDelay = gAlign(duration, startTime)
+//  if(ncbDelay) {
+//    ns.tprint('WARN'+ts()+'sleep before next batch '+ncbDelay/1000+'s')
+//    await ns.asleep(ncbDelay)
+//  }
 }
 
 /** @param {NS} ns */
 const orchids = async (ns, hitlist, botnet) => {
   const [{host:target, getAllocation, duration, moneyMax, minDifficulty}] = hitlist
   const batches = getAllocation().toSorted(multiSort(['offset']))
-  let mm, es
+  let mm, es, fails=0
   while(2) {
     ns.tprint(ts()+'checking')
     if((mm = moneyMax-ns.getServerMoneyAvailable(target)),
         (es = ns.getServerSecurityLevel(target) - minDifficulty) || mm) {
       ns.tprint(`ERROR ${ts()}needs to be topped:\n$-${mm} ${minDifficulty}+${es}`)
+      if(++fails > failThreshold) {
+        ns.tprint(`ERROR ${ts()}respawing cause fails...`)
+        await ns.asleep(batchDelta)
+        respawn(ns)
+      }
       await prep(ns, hitlist[0], botnet, mm, es)
-    }
+    } else if(fails>0) fails--
     ns.tprint(ts()+'running')
     await traitor(ns, batches, {target,moneyMax,minDifficulty}, duration)
   }
