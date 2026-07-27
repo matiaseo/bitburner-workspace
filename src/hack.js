@@ -9,7 +9,7 @@ const actDelta = 256
 const checkWindow = actDelta*8
 const batchDelta = actDelta*4 + checkWindow
 const baseOrchDelay = actDelta >> 1
-const failThreshold = 4
+const failThreshold = 8
 
 /** @param {NS} ns */
 const getThreads = (ns, host) =>
