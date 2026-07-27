@@ -1,7 +1,8 @@
 import { flatten, selectTop, jisn, jssn,
   multiSort, deformat, formatNumber, ts } from './helpers.js'
 import { scan } from './scanner.js'
-import { deploy, getBatchData, killPrevious, respawn, getWeakSecurity } from "./utils.js"
+import { deploy, getBatchData, killPrevious, respawn,
+  getWeakSecurity, addAllocation, getRamListByCores } from "./utils.js"
 
 const stealer = 'scripts/steal.js'
 const actDelta = 256
@@ -35,82 +36,6 @@ const getCores = botnet => Array.from(new Set(
     botnet.map(({cpuCores})=>cpuCores)
   )).toSorted((a,b)=>a-b)
 
-const getRamListBycores = (botnet, cores=getCores(botnet)) =>
-  botnet.reduce((totals, {cpuCores, maxRam, host}) =>
-      Object.assign({}, totals, {
-          [cpuCores]: totals[cpuCores].concat({host,ram:maxRam})
-        })
-    , Object.fromEntries(cores.map(c=>[c,[]])))
-
-const getOptimalSlice = (threads, [start, ...optimal]) => {
-  const startIndex = threads.findIndex(([k]) => k == start)
-  return threads.slice(startIndex)
-    .concat(startIndex > 0 && getOptimalSlice(threads.slice(0, startIndex), optimal) || [])
-}
-const getOrderedThreads = (threads, optimal) =>
-  getOptimalSlice(Object.entries(threads).sort(([k1],[k2])=>k1-k2), optimal)
-    .filter(Boolean)
-
-const deductCost = (orderedThreads, resources, act, allocatedActs) => {
-  const resCount = Object.keys(resources).length
-  for(let i=0; i < resCount; i++) {
-    const [cores, [threads, mem]] = orderedThreads[i]
-    const [leftovers, host] = resources[cores].reduce(
-        ([leftovers, h], { host, ram }) =>
-          h ? [leftovers.concat({host,ram}), h]
-          : [leftovers.concat({ host, ram: ram >= mem ? ram-mem : ram }),
-            ram >= mem && host]
-      , [[], false])
-
-    if(host)
-      return [
-        Object.assign({}, resources, { [cores]: leftovers }),
-        allocatedActs.concat({...act, host, threads})
-      ]
-  }
-  //console.log('out of resources', resources, orderedThreads)
-  return null
-}
-
-const setOffset = (delta, index, delay=delta*index) => ({offset, ...act}) =>
-  Object.assign({offset: offset + delay}, act)
-
-const allocateBatch = (batch, delta, resources, alloc=[]) => {
-  const [leftovers, nextAlloc] = batch
-    .map(setOffset(delta, alloc.length>>2))
-    .reduce(([resources, alloActs], { orderedThreads, ...act }) =>
-        resources &&
-          deductCost(orderedThreads, resources, act, alloActs)
-            || []
-      , [resources, []])
-
-  const newAlloc = alloc.concat(nextAlloc ?? [])
-
-  return !leftovers? newAlloc : allocateBatch(batch, delta, leftovers, newAlloc)
-}
-
-const addAllocation = (ns, cores, botnetRes, delta=batchDelta) =>
-  target => {
-  const { batch: rawB, '$/s':flow, duration } = getBatchData(ns, target, cores, actDelta)
-  const batch = rawB.map(({threads, optimalCores, ...act}) =>
-    Object.assign({
-      orderedThreads: getOrderedThreads(threads, optimalCores)
-    }, act))
-  const batchFit = [batch, batch.toReversed()]
-    .map(batch => allocateBatch(batch, delta, botnetRes))
-    .reduce((fw, rev) => rev.length > fw.length ? rev : fw)
-  const concurrency = (batchFit.length-1)>>2
-  const potential = deformat(flow) * concurrency
-  console.log(potential, concurrency, batchFit)
-  return {
-    ...target,
-    potential,
-    concurrency,
-    '$/s': formatNumber(potential),
-    duration,
-    getAllocation: () => batchFit
-  }
-}
 
 const gAlign = (duration, startTime) => {
   const now = (performance.now() - startTime)
@@ -128,7 +53,7 @@ const traitor = async (ns, batches, {target}, duration, port=1) => {
     if(delay <= 0) {
       ns.exec(stealer, act.host, {
           threads: act.threads,
-          ramOverride: (act.action === 'hack' ? 1.7 : 1.75)
+          ramOverride: act.ram
         }, act.action, target, port, act.actIndex)
       i++
       //if(delay < -actDelta) console.error('drift='+delay)
@@ -156,7 +81,7 @@ const [,weakSec1] = getWeakSecurity(1)
 
 /** @param {NS} ns */
 const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
-  const homeSlts = Math.floor((ns.getServerMaxRam()-ns.getServerUsedRam())/1.75)
+  const homeSlts = bots[0].cap
   const growTime = mm && ns.getGrowTime(host)^0
   const weakTime = mm && ns.getWeakenTime(host)^0
   const syncTime = mm && weakTime - growTime + actDelta
@@ -167,26 +92,18 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
   )
   const gwThreads = mm && Math.ceil(.004*growThreads / weakSec1)
 
-  const homeLeft = es && homeSlts - (mm && growThreads + gwThreads)
-  const esThreads = es && Math.ceil(es / weakSec1)
-  const esBots = es && bots.slice(1).map(({host, maxRam}) => ({
-        host,
-        cap: Math.floor((maxRam - ns.getServerUsedRam(host)) / 1.75)
-      })
-    ).toSorted((a,b)=>b.cap-a.cap)
+  const homeLeft = homeSlts - (mm && growThreads + gwThreads)
+  const esThreads = Math.ceil(es / weakSec1)
+  const esBots = bots.slice(1)
     .concat({ host: 'home', cap: homeLeft })
-    .filter(({cap})=>cap)
-    .reduce(([bots, pending], {host, cap}) =>
-        pending > 0 ?
-          [bots.concat({host,threads:Math.min(cap, pending)}), pending - cap]
-          : [bots, 0]
-      , [[], esThreads])[0]
+    .filter(({cap}) => cap > 0)
+    .reduce((bots, {host, cap}) => bots.concat({host,threads:cap}), [])
 
   console.log(homeLeft, esThreads, esBots, es)
-  const startTime = performance.now()
+  //const startTime = performance.now()
   if(es) {
     execWeak(ns, esThreads, host, esBots)
-    await ns.asleep(actDelta)
+    if(mm) await ns.asleep(actDelta)
   }
   if(mm) {
     execWeak(ns, gwThreads, host)
@@ -204,6 +121,15 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
 const orchids = async (ns, hitlist, botnet) => {
   const [{host:target, getAllocation, duration, moneyMax, minDifficulty}] = hitlist
   const batches = getAllocation().toSorted(multiSort(['offset']))
+  const reserved = getAllocation()
+    .reduce((reserved,{host,ram,threads}) =>
+        Object.assign({},reserved,{
+          [host]: (reserved[host]??0) + ram*threads
+        })
+      ,{})
+  const fb = botnet.map(({ maxRam, host }) =>
+      ({ host, cap: Math.floor((maxRam - reserved[host]) / 1.75) }))
+    .filter(({ cap }) => cap > 0)
   let mm, es, fails=0
   while(2) {
     ns.tprint(ts()+'checking')
@@ -215,7 +141,7 @@ const orchids = async (ns, hitlist, botnet) => {
         await ns.asleep(batchDelta)
         respawn(ns)
       }
-      await prep(ns, hitlist[0], botnet, mm, es)
+      await prep(ns, hitlist[0], fb, mm, es)
     } else if(fails>0) fails--
     ns.tprint(ts()+'running')
     await traitor(ns, batches, {target,moneyMax,minDifficulty}, duration)
@@ -245,11 +171,11 @@ export async function main(ns) {
   const cores = Array.from(new Set(botnet.map(({cpuCores})=>cpuCores)))
     .toSorted((a,b)=>a-b)
   ns.tprint(`INFO botnet cores=${cores}`)
-  const botnetResources = getRamListBycores(botnet, cores)
+  const botnetResources = getRamListByCores(botnet, cores)
   //ns.tprint(jssn`INFO botnet resources=${getResources(botnet)}\n${botnetResources}`)
 
   const eligibleHosts = hosts.filter(({ level }) => hackingLevel >= level)
-    .map(addAllocation(ns, cores, botnetResources))
+    .map(addAllocation(ns, cores, botnetResources, {batchDelta,actDelta}))
 
   const targets = selectTop(eligibleHosts, 1)
 

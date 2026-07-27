@@ -1,4 +1,4 @@
-import { flatten, jisn } from './helpers.js'
+import { flatten, jisn, jssn } from './helpers.js'
 import { scan } from './scanner.js'
 
 const getMaxPorts = ns =>
@@ -34,6 +34,6 @@ export async function main(ns) {
     (await availableTools.reduce(async (results, tool) => (await results).concat(await tool(host)), [])).map(Number)
   ))
 
-  ns.tprint(jisn`INFO done ${results}`)
+  ns.tprint(jssn`INFO done ${results}`)
 }
 

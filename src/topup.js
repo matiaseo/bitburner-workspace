@@ -1,5 +1,6 @@
-import { flatten } from "./helpers.js"
+import { flatten, multiSort, selectTop } from "./helpers.js"
 import { scan } from './scanner.js'
+import { addAllocation, getRamListByCores } from "./utils.js"
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -8,12 +9,26 @@ export async function main(ns) {
     const freeRam = ns.getServerMaxRam() - ns.getServerUsedRam()
     const hosts = flatten(scan(ns, 32))
     const hackingLevel = ns.getPlayer().skills.hacking
-    const targets = hosts.filter(
-      ({ level, moneyMax, minDifficulty, host }) =>
-      hackingLevel >= level && moneyMax
-        && ns.getServerSecurityLevel(host) > minDifficulty
-          && ns.getServerMoneyAvailable(host) < moneyMax
-    ).filter(Boolean)
+
+    const botnet = [
+      {host:'home',maxRam:(ns.getServerMaxRam()-128)|0,cpuCores:2,status:'root'}
+    ].concat(hosts)
+      .filter(({ status, maxRam }) => status === 'root' && maxRam)
+      .toSorted(multiSort(['cpuCores'],['maxRam']))
+
+    const cores = Array.from(new Set(botnet.map(({cpuCores})=>cpuCores)))
+      .toSorted((a,b)=>a-b)
+    ns.tprint(`INFO botnet cores=${cores}`)
+    const botnetResources = getRamListByCores(botnet, cores)
+    const eligibleHosts = hosts.filter(({ level }) => hackingLevel >= level)
+      .map(addAllocation(ns, cores, botnetResources, {actDelta:1,batchDelta:1}))
+    console.log(eligibleHosts, botnet, botnetResources)
+    const targets = selectTop(eligibleHosts, 1)
+      .filter(({ level, moneyMax, minDifficulty, host }) =>
+        hackingLevel >= level && moneyMax
+          && (ns.getServerSecurityLevel(host) > minDifficulty
+            || ns.getServerMoneyAvailable(host) < moneyMax))
+      .filter(Boolean)
     if(!targets.length) return ns.tprint('ERROR no targets')
     const threads = Math.floor(freeRam / ram)
     if(threads)
@@ -22,17 +37,14 @@ export async function main(ns) {
           ns.run('scripts/topup.js', { ramOverride: ram, threads },
             host, moneyMax, securityMin))
       )
-    const botnet = hosts.filter(({ status, maxRam }) => status === 'root' && maxRam>ram)
     botnet.forEach(({ host }) => ns.scp('scripts/top.js', host))
     botnet.forEach(({ host: botHost, maxRam }) => {
-      let capacity = Math.floor(maxRam/ram)
-      const threads = Math.max(Math.floor(capacity/targets.length), 1)
-      while(capacity--) {
+      const capacity = Math.floor(maxRam/ram)
+      const threads = Math.max(capacity, 1)
         console.log(targets, capacity)
-        const { host, moneyMax, minDifficulty } = targets[capacity%targets.length]
+        const [{ host, moneyMax, minDifficulty }] = targets
         ns.exec('scripts/top.js', botHost, { ramOverride: ram, threads },
           host, moneyMax, minDifficulty)
-      }
     })
   } else {
     let escaper=1e5

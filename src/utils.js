@@ -1,4 +1,4 @@
-import { formatNumber } from './helpers.js'
+import { formatNumber, deformat } from './helpers.js'
 
 /** @param {NS} ns */
 export const killPrevious = ns =>
@@ -125,4 +125,80 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
   }
 }
 
+export const getRamListByCores = (botnet, cores=getCores(botnet)) =>
+  botnet.reduce((totals, {cpuCores, maxRam, host}) =>
+      Object.assign({}, totals, {
+          [cpuCores]: totals[cpuCores].concat({host,ram:maxRam})
+        })
+    , Object.fromEntries(cores.map(c=>[c,[]])))
 
+const getOptimalSlice = (threads, [start, ...optimal]) => {
+  const startIndex = threads.findIndex(([k]) => k == start)
+  return threads.slice(startIndex)
+    .concat(startIndex > 0 && getOptimalSlice(threads.slice(0, startIndex), optimal) || [])
+}
+
+const getOrderedThreads = (threads, optimal) =>
+  getOptimalSlice(Object.entries(threads).sort(([k1],[k2])=>k1-k2), optimal)
+    .filter(Boolean)
+
+const deductCost = (orderedThreads, resources, act, allocatedActs) => {
+  const resCount = Object.keys(resources).length
+  for(let i=0; i < resCount; i++) {
+    const [cores, [threads, mem]] = orderedThreads[i]
+    const [leftovers, host] = resources[cores].reduce(
+        ([leftovers, h], { host, ram }) =>
+          h ? [leftovers.concat({host,ram}), h]
+          : [leftovers.concat({ host, ram: ram >= mem ? ram-mem : ram }),
+            ram >= mem && host]
+      , [[], false])
+
+    if(host)
+      return [
+        Object.assign({}, resources, { [cores]: leftovers }),
+        allocatedActs.concat({...act, host, threads, ram: mem/threads})
+      ]
+  }
+  //console.log('out of resources', resources, orderedThreads)
+  return null
+}
+
+const setOffset = (delta, index, delay=delta*index) => ({offset, ...act}) =>
+  Object.assign({offset: offset + delay}, act)
+
+const allocateBatch = (batch, delta, resources, alloc=[]) => {
+  const [leftovers, nextAlloc] = batch
+    .map(setOffset(delta, alloc.length>>2))
+    .reduce(([resources, alloActs], { orderedThreads, ...act }) =>
+        resources &&
+          deductCost(orderedThreads, resources, act, alloActs)
+            || []
+      , [resources, []])
+
+  const newAlloc = alloc.concat(nextAlloc ?? [])
+
+  return !leftovers? newAlloc : allocateBatch(batch, delta, leftovers, newAlloc)
+}
+
+export const addAllocation = (ns, cores, botnetRes, {actDelta,batchDelta}) =>
+  target => {
+  const { batch: rawB, '$/s':flow, duration } = getBatchData(ns, target, cores, actDelta)
+  const batch = rawB.map(({threads, optimalCores, ...act}) =>
+    Object.assign({
+      orderedThreads: getOrderedThreads(threads, optimalCores)
+    }, act))
+  const batchFit = [batch, batch.toReversed()]
+    .map(batch => allocateBatch(batch, batchDelta, botnetRes))
+    .reduce((fw, rev) => rev.length > fw.length ? rev : fw)
+  const concurrency = (batchFit.length-1)>>2
+  const potential = deformat(flow) * concurrency
+  console.log(potential, concurrency, batchFit)
+  return {
+    ...target,
+    potential,
+    concurrency,
+    '$/s': formatNumber(potential),
+    duration,
+    getAllocation: () => batchFit
+  }
+}
