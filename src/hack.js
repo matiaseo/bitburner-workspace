@@ -154,7 +154,7 @@ export async function main(ns) {
   const hosts = flatten(hostTree)
   const hackingLevel = ns.getPlayer().skills.hacking
   const botnet = [
-    {host:'home',maxRam:(ns.getServerMaxRam()-128)|0,cpuCores:2,status:'root'}
+    {host:'home',maxRam:ns.getServerMaxRam()-128,cpuCores:2,status:'root'}
   ].concat(hosts)
     .filter(({ status, maxRam }) => status === 'root' && maxRam)
     .toSorted(multiSort(['cpuCores'],['maxRam']))
