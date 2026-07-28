@@ -166,7 +166,7 @@ const deductCost = (orderedThreads, resources, act, allocatedActs) => {
 const setOffset = (delta, index, delay=delta*index) => ({offset, ...act}) =>
   Object.assign({offset: offset + delay}, act)
 
-const allocateBatch = (batch, delta, resources, alloc=[]) => {
+const allocateBatch = ({batch, delta, resources, maxConcurrency}, alloc=[]) => {
   const [leftovers, nextAlloc] = batch
     .map(setOffset(delta, alloc.length>>2))
     .reduce(([resources, alloActs], { orderedThreads, ...act }) =>
@@ -177,18 +177,20 @@ const allocateBatch = (batch, delta, resources, alloc=[]) => {
 
   const newAlloc = alloc.concat(nextAlloc ?? [])
 
-  return !leftovers? newAlloc : allocateBatch(batch, delta, leftovers, newAlloc)
+  return (!leftovers || (newAlloc.length>>2) >= maxConcurrency) ? newAlloc
+    : allocateBatch({batch, delta, resources: leftovers, maxConcurrency}, newAlloc)
 }
 
-export const addAllocation = (ns, cores, botnetRes, {actDelta,batchDelta}) =>
+export const addAllocation = (ns, cores, resources, {actDelta,batchDelta}) =>
   target => {
   const { batch: rawB, '$/s':flow, duration } = getBatchData(ns, target, cores, actDelta)
+  const maxConcurrency = duration/batchDelta
   const batch = rawB.map(({threads, optimalCores, ...act}) =>
     Object.assign({
       orderedThreads: getOrderedThreads(threads, optimalCores)
     }, act))
   const batchFit = [batch, batch.toReversed()]
-    .map(batch => allocateBatch(batch, batchDelta, botnetRes))
+    .map(batch => allocateBatch({batch, delta: batchDelta, resources, maxConcurrency}))
     .reduce((fw, rev) => rev.length > fw.length ? rev : fw)
   const concurrency = (batchFit.length-1)>>2
   const potential = deformat(flow) * concurrency
@@ -197,6 +199,7 @@ export const addAllocation = (ns, cores, botnetRes, {actDelta,batchDelta}) =>
     ...target,
     potential,
     concurrency,
+    maxConcurrency,
     '$/s': formatNumber(potential),
     duration,
     getAllocation: () => batchFit
