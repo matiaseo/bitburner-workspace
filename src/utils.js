@@ -13,6 +13,8 @@ export const respawn = (ns, threads=1, spawnDelay=0) =>
 /** @param {NS} ns */
 export const deploy = (ns, scripts, hosts) =>
   [].concat(hosts).forEach(({ host }) => ns.scp(scripts, host))
+export const deployList = (ns, list, hosts) =>
+  deploy(ns, list.split(',').map(s=>`scripts/${s}.js`), hosts)
 
 const allCores = [...(~0>>>0).toString(2)].map((_,i)=>i+1)
 const allWeakSec = allCores.map(c=>[c, .05+.003125*(c-1)])
@@ -124,6 +126,10 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
     '$/GB': formatNumber(batchMoney/totalRam)
   }
 }
+
+const getCores = botnet => Array.from(new Set(
+    botnet.map(({cpuCores})=>cpuCores)
+  )).toSorted((a,b)=>a-b)
 
 export const getRamListByCores = (botnet, cores=getCores(botnet)) =>
   botnet.reduce((totals, {cpuCores, maxRam, host}) =>

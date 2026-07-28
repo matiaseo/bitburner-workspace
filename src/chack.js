@@ -1,7 +1,5 @@
-import { flatten, selectTop, jisn, jssn,
-  multiSort, ts } from './helpers.js'
-import { scan } from './scanner.js'
-import { deploy, deployList, killPrevious, respawn,
+import { jssn, multiSort, ts } from './helpers.js'
+import { killPrevious, respawn,
   getWeakSecurity, addAllocation, getRamListByCores } from "./utils.js"
 
 const stealer = 'scripts/steal.js'
@@ -10,6 +8,32 @@ const checkWindow = actDelta*2
 const batchDelta = actDelta*4 + checkWindow
 const baseOrchDelay = actDelta >> 1
 const failThreshold = 8
+
+/** @param {NS} ns */
+const getThreads = (ns, host) =>
+  ns.getServerMaxRam(host) / ns.getScriptRam(stealer)
+
+const getExecParams = (ns, {host}) => [stealer, host, getThreads(ns, host)]
+
+const categorizeBots = threshold => (categories, bot) => ({
+    hack: categories.hack.concat(bot.cpuCores < threshold ? bot : []),
+    wegw: categories.wegw.concat(bot.cpuCores >= threshold ? bot : [])
+  })
+
+const getCpuThreshold = bots =>
+  bots.reduce((compute, { cpuCores, maxRam }) =>
+      [compute[0] + cpuCores*maxRam, compute[1] + maxRam]
+    , [0, 0]).reduce((cpuRam, maxRam) => cpuRam / maxRam)
+
+const getResources = bots =>
+  bots.reduce((total, { maxRam }) =>
+      ({hosts: total.hosts+1, RAM: total.RAM+maxRam})
+    , {hosts:0, RAM:0})
+
+const getCores = botnet => Array.from(new Set(
+    botnet.map(({cpuCores})=>cpuCores)
+  )).toSorted((a,b)=>a-b)
+
 
 const gAlign = (duration, startTime, strict=false) => {
   const now = (performance.now() - startTime)
@@ -43,11 +67,11 @@ const traitor = async (ns, batches, {target}, duration, port=1) => {
 }
 
 const execGrow = (ns, threads, target) =>
-  ns.exec(stealer,'home',{threads,ramOverride:1.75},'grow',target,1,1)
+  ns.exec(stealer,'',{threads,ramOverride:1.75},'grow',target,1,1)
 
 const execWeak = (ns, threads, target, bots) =>
   !bots ?console.log(threads)||
-    ns.exec(stealer,'home',{threads,ramOverride:1.75},'weak',target,1,2)
+    ns.exec(stealer,'',{threads,ramOverride:1.75},'weak',target,1,2)
   : bots.forEach(({ host, threads }) =>console.log(host, threads)||
     ns.exec(stealer,host,{threads,ramOverride:1.75},'weak',target,1,0)
   )
@@ -70,7 +94,6 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
   const homeLeft = homeSlts - (mm && growThreads + gwThreads)
   const esThreads = Math.ceil(es / weakSec1)
   const esBots = bots.slice(1)
-    .concat({ host: 'home', cap: homeLeft })
     .filter(({cap}) => cap > 0)
     .reduce((bots, {host, cap}) => bots.concat({host,threads:cap}), [])
 
@@ -85,11 +108,6 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
     await ns.asleep(syncTime)
     execGrow(ns, growThreads, host)
   }
-//  const ncbDelay = gAlign(duration, startTime)
-//  if(ncbDelay) {
-//    ns.tprint('WARN'+ts()+'sleep before next batch '+ncbDelay/1000+'s')
-//    await ns.asleep(ncbDelay)
-//  }
 }
 
 /** @param {NS} ns */
@@ -111,7 +129,7 @@ const orchids = async (ns, hitlist, botnet) => {
     ns.tprint(ts()+'checking')
     if((mm = moneyMax-ns.getServerMoneyAvailable(target)),
         (es = ns.getServerSecurityLevel(target) - minDifficulty) || mm) {
-      ns.tprint(`ERROR ${ts()}needs to be topped:\n-$${(100*mm/moneyMax).toFixed(2)}% +${es.toFixed(6)}`)
+      ns.tprint(`ERROR ${ts()}needs to be topped:\n$${(100*mm/moneyMax).toFixed(2)}% +${es.toFixed(6)}`)
       if(mm && es && (mm/moneyMax > .4 || es/minDifficulty > .2))
         fails++
       if(fails > failThreshold) {
@@ -126,45 +144,43 @@ const orchids = async (ns, hitlist, botnet) => {
   }
 }
 
+const moneyRatio = .05
+const getPossibleUpgrade = (csRam, newRam, checkCost) =>
+  newRam <= csRam ? 0
+    : checkCost(newRam) ? newRam
+      : getPossibleUpgrade(csRam, newRam>>1, checkCost)
+
 /** @param {NS} ns */
 export async function main(ns) {
-  const hostTree = scan(ns, 32)
-  const hosts = flatten(hostTree)
-  const cloudHosts = hosts.filter(({host}) => /^cs\d{2}$/.test(host))
-  const hackingLevel = ns.getPlayer().skills.hacking
-  const botnet = [
-    {host:'home',maxRam:ns.getServerMaxRam()-128,cpuCores:2,status:'root'}
-  ].concat(hosts.slice(0, -cloudHosts.length))
-    .filter(({ status, maxRam }) => status === 'root' && maxRam)
-    .toSorted(multiSort(['cpuCores'],['maxRam']))
+  const [cs, host, level, moneyMax, minDifficulty, debug] = ns.args
+  const target = { host, level, moneyMax, minDifficulty }
+  const uMoney = ns.getPlayer().money * moneyRatio
+  const csRam = ns.getServerMaxRam()
+  const ramLimit = ns.cloud.getRamLimit()
+  const upgrade = csRam < ramLimit && getPossibleUpgrade(csRam, ramLimit,
+    ram => ns.cloud.getServerUpgradeCost(cs, ram) < uMoney)
+  if(upgrade) ns.cloud.upgradeServer(cs, upgrade)
 
-  deploy(ns, stealer, hosts)
-
-  const cores = Array.from(new Set(botnet.map(({cpuCores})=>cpuCores)))
-    .toSorted((a,b)=>a-b)
-  ns.tprint(`INFO botnet cores=${cores}`)
+  const botnet = [{
+    host:cs,
+    maxRam:ns.getServerMaxRam()-ns.getServerUsedRam(),
+    cpuCores:1,
+    status:'root'
+  }]
+  const cores = [1]
   const botnetResources = getRamListByCores(botnet, cores)
 
-  const eligibleHosts = hosts.filter(({ level }) => hackingLevel >= level)
+  const targets = [target]
     .map(addAllocation(ns, cores, botnetResources, {batchDelta,actDelta}))
 
-  const targets = selectTop(eligibleHosts, 1 + cloudHosts.length)
+  ns.tprint(jssn`INFO targetting ${targets} from ${cs}`)
 
-  ns.tprint(jisn`INFO targetting ${targets.length} hosts = ${targets} with botnet size=[${botnet.length}; ${cloudHosts.length}]`)
+  console.log(upgrade, ramLimit, csRam, uMoney, targets, cs, botnet)
 
-  console.log(targets, cloudHosts)
-  if(cloudHosts.length) {
-    deployList(ns, 'chack,utils,helpers', cloudHosts)
-    targets.slice(1).forEach(({ host, level, moneyMax, minDifficulty }, index) =>
-      console.log('scripts/chack.js', cloudHosts[index].host, 1,
-        cloudHosts[index].host, host, level, moneyMax, minDifficulty, 'debug', ns.exec('scripts/chack.js', cloudHosts[index].host, 1,
-        cloudHosts[index].host, host, level, moneyMax, minDifficulty, 'debug'))
-    )
-  }
-
-  if(ns.args[0] === 'debug')
+  if(debug)
     return ns.tprint(jssn`INFO ${targets[0].getAllocation()}`)
+
   killPrevious(ns)
-  return orchids(ns, targets.slice(0, 1), botnet)
+  return orchids(ns, targets, botnet)
 }
 
