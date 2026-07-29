@@ -12,12 +12,14 @@ export async function main(ns) {
     const cloudHosts = hosts.filter(({host}) => /^cs\d{2}$/.test(host))
     const hackingLevel = ns.getPlayer().skills.hacking
 
-    const botnet = cloudHosts/*[
+    const botnet = [
       {host:'home',maxRam:ns.getServerMaxRam()-128,cpuCores:2,status:'root'}
     ].concat(hosts)
+      .filter(({host}) => cloudHosts.every(cs=>cs.host !== host))
       .filter(({ status, maxRam }) => status === 'root' && maxRam)
+      .concat({host:'cs20',maxRam:ns.getServerMaxRam('cs20'),cpuCores:1,status:'root'})
       .toSorted(multiSort(['cpuCores'],['maxRam']))
-*/
+
     const cores = Array.from(new Set(botnet.map(({cpuCores})=>cpuCores)))
       .toSorted((a,b)=>a-b)
     ns.tprint(`INFO botnet cores=${cores}`)

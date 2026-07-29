@@ -46,9 +46,9 @@ const execGrow = (ns, threads, target) =>
   ns.exec(stealer,'home',{threads,ramOverride:1.75},'grow',target,1,1)
 
 const execWeak = (ns, threads, target, bots) =>
-  !bots ?console.log(threads)||
+  !bots ?
     ns.exec(stealer,'home',{threads,ramOverride:1.75},'weak',target,1,2)
-  : bots.forEach(({ host, threads }) =>console.log(host, threads)||
+  : bots.forEach(({ host, threads }) =>
     ns.exec(stealer,host,{threads,ramOverride:1.75},'weak',target,1,0)
   )
 
@@ -108,7 +108,7 @@ const orchids = async (ns, hitlist, botnet) => {
   console.log(fb)
   let mm, es, fails=0
   while(2) {
-    ns.tprint(ts()+'checking')
+    ns.tprint(ts()+'checking '+target)
     if((mm = moneyMax-ns.getServerMoneyAvailable(target)),
         (es = ns.getServerSecurityLevel(target) - minDifficulty) || mm) {
       ns.tprint(`ERROR ${ts()}needs to be topped:\n-$${(100*mm/moneyMax).toFixed(2)}% +${es.toFixed(6)}`)
@@ -121,7 +121,6 @@ const orchids = async (ns, hitlist, botnet) => {
       }
       await prep(ns, hitlist[0], fb, mm, es)
     } else fails >>= 1
-    ns.tprint(ts()+'running')
     await traitor(ns, batches, {target,moneyMax,minDifficulty}, duration)
   }
 }
@@ -153,11 +152,11 @@ export async function main(ns) {
     .toSorted((a, b) => b.potential - a.potential)
 
   ns.tprint(jisn`INFO targetting ${targets.length} hosts = ${targets} with botnet size=[${botnet.length}; ${cloudHosts.length}]`)
-
+  const netTs = 1
   console.log(targets, cloudHosts)
   if(cloudHosts.length) {
     deployList(ns, 'chack,utils,helpers', cloudHosts)
-    targets.slice(1).reduce((bots, {host,level,moneyMax,minDifficulty,maxRam}) => {
+    targets.slice(netTs).reduce((bots, {host,level,moneyMax,minDifficulty,maxRam}) => {
       const usable = bots.find(({maxRam:botRam, freeRam=botRam-15}) => maxRam < freeRam)
       return !usable ? bots : bots.map(b => b !== usable ? b : {
           ...b,
@@ -178,6 +177,8 @@ export async function main(ns) {
   if(ns.args[0] === 'debug')
     return ns.tprint(jssn`INFO ${targets[0].getAllocation().length}`)
   killPrevious(ns)
-  return orchids(ns, targets.slice(0, 1), botnet)
+  while(ns.args[0] === 'cloudy')
+    await ns.asleep(10000)
+  return orchids(ns, targets.slice(0, netTs), botnet)
 }
 

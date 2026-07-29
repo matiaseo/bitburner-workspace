@@ -48,9 +48,12 @@ export const jssn = (tt, ...xx) =>
 const scaleSuffixes = ' k m b t Qd Qn Sx Sp O'.split(' ')
 const getSuffix = scale => scaleSuffixes[scale] ?? 'cl'
 
-export const formatNumber = (n, scale=0) =>
-  n < 1000 ? n.toFixed(2) + getSuffix(scale)
+export const formatNumber = (n, scale=0) => {
+  try {
+    return n < 1000 ? n.toFixed(2) + getSuffix(scale)
     : formatNumber(n/1000, scale + 1)
+  } catch(e) { return n.toFixed(2)+'cl' }
+}
 
 export const deformat = text =>
   text.match(/^([0-9.]+)(\w{0,2})$/)

@@ -70,9 +70,9 @@ const execGrow = (ns, threads, target, bots) =>
   ns.exec(stealer,bots[0].host,{threads,ramOverride:1.75},'grow',target,1,1)
 
 const execWeak = (ns, threads, target, bots) =>
-  !bots ?console.log(threads)||
+  !bots ?
     ns.exec(stealer,bots[0].host,{threads,ramOverride:1.75},'weak',target,1,2)
-  : bots.forEach(({ host, threads }) =>console.log(host, threads)||
+  : bots.forEach(({ host, threads }) =>
     ns.exec(stealer,host,{threads,ramOverride:1.75},'weak',target,1,0)
   )
 
@@ -110,31 +110,29 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
 const orchids = async (ns, hitlist, botnet, freeRam) => {
   const [{host:target, getAllocation, duration, moneyMax, minDifficulty}] = hitlist
   const batches = getAllocation().toSorted(multiSort(['offset']))
-  const reserved = getAllocation()
-    .reduce((reserved,{host,ram,threads}) =>
-        Object.assign({},reserved,{
-          [host]: (reserved[host]??0) + ram*threads
-        })
-      ,{})
+//  const reserved = getAllocation()
+//    .reduce((reserved,{host,ram,threads}) =>
+//        Object.assign({},reserved,{
+//          [host]: (reserved[host]??0) + ram*threads
+//        })
+//      ,{})
   const fb = botnet.map(({ host }) => ({ host, cap: Math.floor(freeRam / 1.75) }))
     .filter(({ cap }) => cap > 0)
   console.log(fb)
   let mm, es, fails=0
   while(2) {
-    ns.tprint(ts()+'checking')
+    ns.tprint(ts()+'checking '+target)
     if((mm = moneyMax-ns.getServerMoneyAvailable(target)),
         (es = ns.getServerSecurityLevel(target) - minDifficulty) || mm) {
       ns.tprint(`ERROR ${ts()}needs to be topped:\n$${(100*mm/moneyMax).toFixed(2)}% +${es.toFixed(6)}`)
       if(mm && es && (mm/moneyMax > .4 || es/minDifficulty > .2))
         fails++
       if(fails > failThreshold) {
-        ns.tprint(`ERROR ${ts()}respawing cause fails...`)
+        ns.tprint(`ERROR ${ts()}many fails...`)
         await ns.asleep(batchDelta)
-        respawn(ns)
       }
       await prep(ns, hitlist[0], fb, mm, es)
     } else fails >>= 1
-    ns.tprint(ts()+'running')
     await traitor(ns, batches, {target,moneyMax,minDifficulty}, duration)
   }
 }

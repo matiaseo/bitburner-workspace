@@ -70,7 +70,7 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
   const hackPerThread = hackAmount// * hackChance
   const hackThreads = Math.max(Math.floor(targetPercent / hackPerThread), 1)
 
-  const growTargetAmount = 1/(1-hackThreads*hackAmount)//hackPerThread)
+  const growTargetAmount = Math.max(1.1, 1/(1-hackThreads*hackAmount) ||0)
 /*  console.log(hackThreads, ns.hackAnalyzeThreads(host, targetPercent*moneyMax),
     hackChance*hackAmount*moneyMax*hackThreads,
     targetPercent/hackAmount,
