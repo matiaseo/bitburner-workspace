@@ -1,9 +1,10 @@
 import { flatten, multiSort, selectTop } from "./helpers.js"
 import { scan } from './scanner.js'
-import { addAllocation, getRamListByCores } from "./utils.js"
+import { addAllocation, getRamListByCores, killPrevious } from "./utils.js"
 
 /** @param {NS} ns */
 export async function main(ns) {
+  killPrevious(ns)
   if(!ns.args[0]) {
     const ram = ns.getScriptRam('scripts/top.js')
     const freeRam = ns.getServerMaxRam() - ns.getServerUsedRam()
@@ -21,7 +22,7 @@ export async function main(ns) {
       .toSorted((a,b)=>a-b)
     ns.tprint(`INFO botnet cores=${cores}`)
     const botnetResources = getRamListByCores(botnet, cores)
-    const eligibleHosts = hosts.filter(({ level }) => hackingLevel >= level)
+    const eligibleHosts = hosts.filter(({ level, moneyMax }) => hackingLevel >= level && moneyMax)
       //.map(addAllocation(ns, cores, botnetResources, {actDelta:1,batchDelta:1}))
     console.log(eligibleHosts, botnet, botnetResources)
     const targets = eligibleHosts//selectTop(eligibleHosts, 1+cloudHosts.length)
@@ -32,22 +33,25 @@ export async function main(ns) {
       .toSorted((a, b) => b.moneyMax - a.moneyMax)
       .filter(Boolean)
     if(!targets.length) return ns.tprint('ERROR no targets')
-//    const threads = Math.floor(freeRam / ram)
-//    if(threads)
-//      targets.forEach(({ host, moneyMax, minDifficulty:securityMin }) =>
-//        ns.tprint('INFO starting '+
-//          ns.run('scripts/topup.js', { ramOverride: ram, threads },
-//            host, moneyMax, securityMin))
-//      )
-    botnet.forEach(({ host }) => ns.scp('scripts/top.js', host))
-    botnet.forEach(({ host: botHost, maxRam }) => {
-      const capacity = Math.floor(maxRam/ram)
-      const threads = Math.max(capacity, 1)
+    const pids = botnet.flatMap(({ host: botHost }) => {
+      ns.scp('scripts/top.js', botHost)
+      const freeRam = ns.getServerMaxRam(botHost) - ns.getServerUsedRam(botHost)
+      const capacity = Math.floor(freeRam/ram)
+      const threads = Math.max(1, Math.floor(capacity/targets.length))
+      return targets.map(({ host, moneyMax, minDifficulty }) => {
         console.log(targets, capacity)
-        const [{ host, moneyMax, minDifficulty }] = targets
-        ns.exec('scripts/top.js', botHost, { ramOverride: ram, threads },
+        console.log('starting top script', botHost, ram, threads, host)
+        return ns.exec('scripts/top.js', botHost, { ramOverride: ram, threads },
           host, moneyMax, minDifficulty)
+      })
     })
+    for(let ppids, sleep=5000;
+      ppids = pids.filter(pid=>ns.getRunningScript(pid));
+      await ns.asleep(Math.max(30000,sleep++)))
+        if(console.log('pending pids',ppids)||!ppids.length) {
+          console.log('no more pids', pids)
+          break
+        }
   } else {
     let escaper=1e5
     const [host, moneyMax, securityMin] = ns.args

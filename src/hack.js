@@ -32,7 +32,7 @@ const traitor = async (ns, batches, {target}, duration, port=1) => {
         }, act.action, target, port, act.actIndex)
       i++
       //if(delay < -actDelta) console.error('drift='+delay)
-      await ns.asleep(Math.floor(actDelta+delay))
+      //await ns.asleep(Math.floor(actDelta+delay))
     } else await ns.asleep(Math.max(1,Math.floor(delay)))
   }
   const ncbDelay = gAlign(duration, startTime)
@@ -133,7 +133,7 @@ export async function main(ns) {
   const cloudHosts = hosts.filter(({host}) => /^cs\d{2}$/.test(host))
   const hackingLevel = ns.getPlayer().skills.hacking
   const botnet = [
-    {host:'home',maxRam:ns.getServerMaxRam()-128,cpuCores:2,status:'root'}
+    {host:'home',maxRam:ns.getServerMaxRam()-1024,cpuCores:4,status:'root'}
   ].concat(hosts.slice(0, -cloudHosts.length))
     .filter(({ status, maxRam }) => status === 'root' && maxRam)
     .toSorted(multiSort(['cpuCores'],['maxRam']))
@@ -145,25 +145,38 @@ export async function main(ns) {
   ns.tprint(`INFO botnet cores=${cores}`)
   const botnetResources = getRamListByCores(botnet, cores)
 
-  const eligibleHosts = hosts.filter(({ level }) => hackingLevel >= level)
+  const eligibleHosts = hosts
+    .filter(({ level, moneyMax }) => hackingLevel >= level && moneyMax)
     .map(addAllocation(ns, cores, botnetResources, {batchDelta,actDelta}))
 
-  const targets = selectTop(eligibleHosts, 1 + cloudHosts.length)
+  const targets = eligibleHosts//selectTop(eligibleHosts, 1 + cloudHosts.length)
+    .toSorted((a, b) => b.potential - a.potential)
 
   ns.tprint(jisn`INFO targetting ${targets.length} hosts = ${targets} with botnet size=[${botnet.length}; ${cloudHosts.length}]`)
 
   console.log(targets, cloudHosts)
   if(cloudHosts.length) {
     deployList(ns, 'chack,utils,helpers', cloudHosts)
-    targets.slice(1).forEach(({ host, level, moneyMax, minDifficulty }, index) =>
-      console.log('scripts/chack.js', cloudHosts[index].host, 1,
-        cloudHosts[index].host, host, level, moneyMax, minDifficulty, 'debug', ns.exec('scripts/chack.js', cloudHosts[index].host, 1,
-        cloudHosts[index].host, host, level, moneyMax, minDifficulty, 'debug'))
-    )
+    targets.slice(1).reduce((bots, {host,level,moneyMax,minDifficulty,maxRam}) => {
+      const usable = bots.find(({maxRam:botRam, freeRam=botRam-15}) => maxRam < freeRam)
+      return !usable ? bots : bots.map(b => b !== usable ? b : {
+          ...b,
+          freeRam: (b.freeRam??b.maxRam) - maxRam,
+          queue: [].concat(b.queue??[])
+            .concat({host,level,moneyMax,minDifficulty})
+        })
+    }, cloudHosts)
+      .filter(({queue}) => queue?.length)
+      .forEach(({ host:botHost, queue, freeRam }) =>
+        queue.forEach(({host,level,moneyMax,minDifficulty}) =>
+          ns.exec('scripts/chack.js', botHost, 1,
+            botHost, host, level, moneyMax, minDifficulty, freeRam/queue.length)
+        )
+      )
   }
 
   if(ns.args[0] === 'debug')
-    return ns.tprint(jssn`INFO ${targets[0].getAllocation()}`)
+    return ns.tprint(jssn`INFO ${targets[0].getAllocation().length}`)
   killPrevious(ns)
   return orchids(ns, targets.slice(0, 1), botnet)
 }

@@ -84,6 +84,7 @@ const getUsefulValues = (ns, host) => {
 /** @param {NS} ns */
 const getInfo = (ns, path) => host => ({
   host, path: ''+path, distance: path.length,
+  connect:path.concat(host).map(h=>'connect '+h).join(';'),
   ...getUsefulValues(ns, host),
   //...filterServerData(ns.getServer(host))
 })

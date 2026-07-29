@@ -56,7 +56,7 @@ const traitor = async (ns, batches, {target}, duration, port=1) => {
         }, act.action, target, port, act.actIndex)
       i++
       //if(delay < -actDelta) console.error('drift='+delay)
-      await ns.asleep(Math.floor(actDelta+delay))
+      //await ns.asleep(Math.floor(actDelta+delay))
     } else await ns.asleep(Math.max(1,Math.floor(delay)))
   }
   const ncbDelay = gAlign(duration, startTime)
@@ -66,12 +66,12 @@ const traitor = async (ns, batches, {target}, duration, port=1) => {
   }
 }
 
-const execGrow = (ns, threads, target) =>
-  ns.exec(stealer,'',{threads,ramOverride:1.75},'grow',target,1,1)
+const execGrow = (ns, threads, target, bots) =>
+  ns.exec(stealer,bots[0].host,{threads,ramOverride:1.75},'grow',target,1,1)
 
 const execWeak = (ns, threads, target, bots) =>
   !bots ?console.log(threads)||
-    ns.exec(stealer,'',{threads,ramOverride:1.75},'weak',target,1,2)
+    ns.exec(stealer,bots[0].host,{threads,ramOverride:1.75},'weak',target,1,2)
   : bots.forEach(({ host, threads }) =>console.log(host, threads)||
     ns.exec(stealer,host,{threads,ramOverride:1.75},'weak',target,1,0)
   )
@@ -93,25 +93,21 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
 
   const homeLeft = homeSlts - (mm && growThreads + gwThreads)
   const esThreads = Math.ceil(es / weakSec1)
-  const esBots = bots.slice(1)
-    .filter(({cap}) => cap > 0)
-    .reduce((bots, {host, cap}) => bots.concat({host,threads:cap}), [])
-
-  console.log(homeLeft, esThreads, esBots, es)
-  //const startTime = performance.now()
-  if(es) {
+  const esBots = bots.map(({host}) => ({host,threads:homeLeft}))
+    .filter(({threads})=>threads>0)
+  if(es && esBots.length) {
     execWeak(ns, esThreads, host, esBots)
     if(mm) await ns.asleep(actDelta)
   }
   if(mm) {
-    execWeak(ns, gwThreads, host)
+    execWeak(ns, gwThreads, host, bots)
     await ns.asleep(syncTime)
-    execGrow(ns, growThreads, host)
+    execGrow(ns, growThreads, host, bots)
   }
 }
 
 /** @param {NS} ns */
-const orchids = async (ns, hitlist, botnet) => {
+const orchids = async (ns, hitlist, botnet, freeRam) => {
   const [{host:target, getAllocation, duration, moneyMax, minDifficulty}] = hitlist
   const batches = getAllocation().toSorted(multiSort(['offset']))
   const reserved = getAllocation()
@@ -120,8 +116,7 @@ const orchids = async (ns, hitlist, botnet) => {
           [host]: (reserved[host]??0) + ram*threads
         })
       ,{})
-  const fb = botnet.map(({ maxRam, host }) =>
-      ({ host, cap: Math.floor((maxRam - reserved[host]) / 1.75) }))
+  const fb = botnet.map(({ host }) => ({ host, cap: Math.floor(freeRam / 1.75) }))
     .filter(({ cap }) => cap > 0)
   console.log(fb)
   let mm, es, fails=0
@@ -152,10 +147,10 @@ const getPossibleUpgrade = (csRam, newRam, checkCost) =>
 
 /** @param {NS} ns */
 export async function main(ns) {
-  const [cs, host, level, moneyMax, minDifficulty, debug] = ns.args
+  const [cs, host, level, moneyMax, minDifficulty, freeRam] = ns.args
   const target = { host, level, moneyMax, minDifficulty }
   const uMoney = ns.getPlayer().money * moneyRatio
-  const csRam = ns.getServerMaxRam()
+  const csRam = ns.getServerMaxRam(cs)
   const ramLimit = ns.cloud.getRamLimit()
   const upgrade = csRam < ramLimit && getPossibleUpgrade(csRam, ramLimit,
     ram => ns.cloud.getServerUpgradeCost(cs, ram) < uMoney)
@@ -163,7 +158,7 @@ export async function main(ns) {
 
   const botnet = [{
     host:cs,
-    maxRam:ns.getServerMaxRam()-ns.getServerUsedRam(),
+    maxRam:ns.getServerMaxRam(cs)-ns.getServerUsedRam(cs),
     cpuCores:1,
     status:'root'
   }]
@@ -177,10 +172,7 @@ export async function main(ns) {
 
   console.log(upgrade, ramLimit, csRam, uMoney, targets, cs, botnet)
 
-  if(debug)
-    return ns.tprint(jssn`INFO ${targets[0].getAllocation()}`)
-
   killPrevious(ns)
-  return orchids(ns, targets, botnet)
+  return orchids(ns, targets, botnet, freeRam)
 }
 

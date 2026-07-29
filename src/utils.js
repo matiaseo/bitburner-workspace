@@ -189,8 +189,8 @@ const allocateBatch = ({batch, delta, resources, maxConcurrency}, alloc=[]) => {
 
 export const addAllocation = (ns, cores, resources, {actDelta,batchDelta}) =>
   target => {
-  const { batch: rawB, '$/s':flow, duration } = getBatchData(ns, target, cores, actDelta)
-  const maxConcurrency = duration/batchDelta
+  const { batch: rawB, '$/s':flow, duration, totalRam } = getBatchData(ns, target, cores, actDelta)
+  const maxConcurrency = Math.floor(duration/batchDelta)
   const batch = rawB.map(({threads, optimalCores, ...act}) =>
     Object.assign({
       orderedThreads: getOrderedThreads(threads, optimalCores)
@@ -206,6 +206,7 @@ export const addAllocation = (ns, cores, resources, {actDelta,batchDelta}) =>
     potential,
     concurrency,
     maxConcurrency,
+    maxRam: totalRam * maxConcurrency,
     '$/s': formatNumber(potential),
     duration,
     getAllocation: () => batchFit

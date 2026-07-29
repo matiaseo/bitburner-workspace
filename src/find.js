@@ -1,4 +1,4 @@
-import { flatten, selectTop, jisn } from './helpers.js'
+import { flatten, jssn } from './helpers.js'
 import { scan } from './scanner.js'
 
 /** @param {NS} ns */
@@ -7,7 +7,7 @@ export function main(ns, target) {
   const hosts = flatten(hostTree)
   const foundHost = hosts.find(({ host }) => host.includes(target ?? ns.args[0]))
 
-  ns.tprint(jisn`WARN target ${foundHost ? '' : 'not '}found = ${foundHost}`)
+  ns.tprint(jssn`WARN target ${foundHost ? '' : 'not '}found = ${foundHost}`)
 
 }
 
