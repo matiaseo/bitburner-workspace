@@ -5,8 +5,8 @@ import { deploy, deployList, killPrevious, respawn,
   getWeakSecurity, addAllocation, getRamListByCores } from "./utils.js"
 
 const stealer = 'scripts/steal.js'
-const actDelta = 256
-const checkWindow = actDelta*2
+const actDelta = 200
+const checkWindow = actDelta*3
 const batchDelta = actDelta*4 + checkWindow
 const baseOrchDelay = actDelta >> 1
 const failThreshold = 8
@@ -148,6 +148,10 @@ export async function main(ns) {
     .filter(({ level, moneyMax }) => hackingLevel >= level && moneyMax)
     .map(addAllocation(ns, cores, botnetResources, {batchDelta,actDelta}))
 
+  const highLevel = hosts
+    .filter(({ level, moneyMax }) => hackingLevel < level && moneyMax)
+    .map(({host, level}) => ({host, level, toString:()=>`${host}[${level}]`}))
+
   const targets = eligibleHosts//selectTop(eligibleHosts, 1 + cloudHosts.length)
     .toSorted((a, b) => b.potential - a.potential)
 
@@ -177,8 +181,14 @@ export async function main(ns) {
   if(ns.args[0] === 'debug')
     return ns.tprint(jssn`INFO ${targets[0].getAllocation().length}`)
   killPrevious(ns)
-  while(ns.args[0] === 'cloudy')
-    await ns.asleep(10000)
+  while(ns.args[0] === 'cloudy') {
+    await ns.asleep(3e4)
+    const hackingLevel = ns.getPlayer().skills.hacking
+    const newTargets = highLevel
+      .filter(({ level, moneyMax }) => hackingLevel >= level)
+      if(newTargets.length)
+        ns.tprint('WARN '+ts()+newTargets)
+  }
   return orchids(ns, targets.slice(0, netTs), botnet)
 }
 

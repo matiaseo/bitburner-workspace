@@ -1,5 +1,3 @@
-import { flatten } from './helpers.js'
-import { scan } from './scanner.js'
 
 const moneyRatio = .05
 const getPossibleUpgrade = (csRam, newRam, checkCost) =>
@@ -8,10 +6,14 @@ const getPossibleUpgrade = (csRam, newRam, checkCost) =>
       : getPossibleUpgrade(csRam, newRam>>1, checkCost)
 
 /** @param {NS} ns */
-export async function main(ns) {
+export function main(ns) {
+  const [count] = ns.args
+  if(count)
+    for(let i=ns.cloud.getServerNames().length; i < count; i++)
+      ns.cloud.purchaseServer(`cs${i.toString(16).padEnd(2,'0')}`, 8)
   const ramLimit = ns.cloud.getRamLimit()
-  flatten(scan(ns, 32)).filter(({host}) => /^cs\d{2}$/.test(host))
-    .forEach(({host:cs}) => {
+  ns.cloud.getServerNames()
+    .forEach(cs => {
       const uMoney = ns.getPlayer().money * moneyRatio
       const csRam = ns.getServerMaxRam(cs)
       const upgrade = csRam < ramLimit && getPossibleUpgrade(csRam, ramLimit,

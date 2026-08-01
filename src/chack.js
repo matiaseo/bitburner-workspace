@@ -3,37 +3,11 @@ import { killPrevious, respawn,
   getWeakSecurity, addAllocation, getRamListByCores } from "./utils.js"
 
 const stealer = 'scripts/steal.js'
-const actDelta = 256
-const checkWindow = actDelta*2
+const actDelta = 200
+const checkWindow = actDelta*3
 const batchDelta = actDelta*4 + checkWindow
 const baseOrchDelay = actDelta >> 1
 const failThreshold = 8
-
-/** @param {NS} ns */
-const getThreads = (ns, host) =>
-  ns.getServerMaxRam(host) / ns.getScriptRam(stealer)
-
-const getExecParams = (ns, {host}) => [stealer, host, getThreads(ns, host)]
-
-const categorizeBots = threshold => (categories, bot) => ({
-    hack: categories.hack.concat(bot.cpuCores < threshold ? bot : []),
-    wegw: categories.wegw.concat(bot.cpuCores >= threshold ? bot : [])
-  })
-
-const getCpuThreshold = bots =>
-  bots.reduce((compute, { cpuCores, maxRam }) =>
-      [compute[0] + cpuCores*maxRam, compute[1] + maxRam]
-    , [0, 0]).reduce((cpuRam, maxRam) => cpuRam / maxRam)
-
-const getResources = bots =>
-  bots.reduce((total, { maxRam }) =>
-      ({hosts: total.hosts+1, RAM: total.RAM+maxRam})
-    , {hosts:0, RAM:0})
-
-const getCores = botnet => Array.from(new Set(
-    botnet.map(({cpuCores})=>cpuCores)
-  )).toSorted((a,b)=>a-b)
-
 
 const gAlign = (duration, startTime, strict=false) => {
   const now = (performance.now() - startTime)
@@ -43,17 +17,18 @@ const gAlign = (duration, startTime, strict=false) => {
 }
 
 /** @param {NS} ns */
-const traitor = async (ns, batches, {target}, duration, port=1) => {
+const traitor = async (ns, batches, {target}, duration, skipHack, port=1) => {
   const startTime = performance.now() + baseOrchDelay
   //if(![target, batches, duration, startTime].every(Boolean))
   //  return ns.tprint(jssn`ERROR missing=${[target, batches, duration, startTime]}`)
   for(let act,i=0; act = batches[i];) {
     const delay = act.offset - (performance.now() - startTime)
     if(delay <= 0) {
-      ns.exec(stealer, act.host, {
-          threads: act.threads,
-          ramOverride: act.ram
-        }, act.action, target, port, act.actIndex)
+      if(!skipHack || act.action !== 'hack')
+        ns.exec(stealer, act.host, {
+            threads: act.threads,
+            ramOverride: act.ram
+          }, act.action, target, port, act.actIndex)
       i++
       //if(delay < -actDelta) console.error('drift='+delay)
       //await ns.asleep(Math.floor(actDelta+delay))
@@ -84,7 +59,7 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
   const growTime = mm && ns.getGrowTime(host)^0
   const weakTime = mm && ns.getWeakenTime(host)^0
   const syncTime = mm && weakTime - growTime + actDelta
-  const growTargetAmount = mm && moneyMax / (moneyMax - mm)
+  const growTargetAmount = mm && Math.max(10, moneyMax / (moneyMax - mm))
   const growThreads = mm && Math.min(
     Math.ceil(ns.growthAnalyze(host, growTargetAmount, 2)),
     homeSlts
@@ -121,19 +96,20 @@ const orchids = async (ns, hitlist, botnet, freeRam) => {
   console.log(fb)
   let mm, es, fails=0
   while(2) {
-    ns.tprint(ts()+'checking '+target)
+    console.log(ts()+'checking '+target)
     if((mm = moneyMax-ns.getServerMoneyAvailable(target)),
         (es = ns.getServerSecurityLevel(target) - minDifficulty) || mm) {
-      ns.tprint(`ERROR ${ts()}needs to be topped:\n$${(100*mm/moneyMax).toFixed(2)}% +${es.toFixed(6)}`)
-      if(mm && es && (mm/moneyMax > .4 || es/minDifficulty > .2))
+      if(mm && es && (mm/moneyMax > .4 || es/minDifficulty > .2)) {
+        ns.tprint(`ERROR ${ts()}needs to be topped:\n$${(100*mm/moneyMax).toFixed(2)}% +${es.toFixed(6)}`)
         fails++
+      }
       if(fails > failThreshold) {
         ns.tprint(`ERROR ${ts()}many fails...`)
         await ns.asleep(batchDelta)
       }
       await prep(ns, hitlist[0], fb, mm, es)
     } else fails >>= 1
-    await traitor(ns, batches, {target,moneyMax,minDifficulty}, duration)
+    await traitor(ns, batches, {target,moneyMax,minDifficulty}, duration, fails>failThreshold)
   }
 }
 

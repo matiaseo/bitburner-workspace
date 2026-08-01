@@ -7,5 +7,5 @@ export const main = async ns => {
       )||1, ramOverride: 4 })
     await ns.asleep(10000)
   }
-  return ns.share()
+  for(;Infinity;await ns.share()){}
 }
