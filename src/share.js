@@ -1,11 +1,12 @@
 /** @param {NS} ns */
 export const main = async ns => {
   while(ns.args[0]) {
-    ns.run(ns.getScriptName(), {
-      threads: Math.min(
-        Math.round((ns.getServerMaxRam()-ns.getServerUsedRam())/4), ns.args[0]
-      )||1, ramOverride: 4 })
-    await ns.asleep(10000)
+    const threads = Math.min(
+        Math.floor((ns.getServerMaxRam()-ns.getServerUsedRam())/4),
+      ns.args[0])||1
+    ns.run(ns.getScriptName(), { threads, ramOverride: 4 })
+    await ns.share()
+    if(ns.args[0] === threads) break
   }
   for(;Infinity;await ns.share()){}
 }

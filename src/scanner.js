@@ -76,6 +76,7 @@ const getUsefulValues = (ns, host) => {
     cpuCores,
     //info: ns.getServer(host),
     status: hasRoot ? 'root' : numOpenPortsRequired,
+    command: `scripts/chack.js home ${host} ${level} ${moneyMax} ${minDifficulty} 32`
     //hasRoot,
     //...details
   }

@@ -145,7 +145,7 @@ export async function main(ns) {
   const botnetResources = getRamListByCores(botnet, cores)
 
   const eligibleHosts = hosts
-    .filter(({ level, moneyMax }) => hackingLevel >= level && moneyMax)
+    .filter(({ level, moneyMax, status }) => hackingLevel >= level && moneyMax&&status ==='root')
     .map(addAllocation(ns, cores, botnetResources, {batchDelta,actDelta}))
 
   const highLevel = hosts
@@ -156,19 +156,20 @@ export async function main(ns) {
     .toSorted((a, b) => b.potential - a.potential)
 
   ns.tprint(jisn`INFO targetting ${targets.length} hosts = ${targets} with botnet size=[${botnet.length}; ${cloudHosts.length}]`)
-  const netTs = 1
+  const netTs = 1-1
   console.log(targets, cloudHosts)
-  if(cloudHosts.length) {
+  if(cloudHosts.length+1) {
     deployList(ns, 'chack,utils,helpers', cloudHosts)
     targets.slice(netTs).reduce((bots, {host,level,moneyMax,minDifficulty,maxRam}) => {
       const usable = bots.find(({maxRam:botRam, freeRam=botRam-15}) => maxRam < freeRam)
+      console.log(bots, usable, host, level, maxRam)
       return !usable ? bots : bots.map(b => b !== usable ? b : {
           ...b,
           freeRam: (b.freeRam??b.maxRam) - maxRam,
           queue: [].concat(b.queue??[])
             .concat({host,level,moneyMax,minDifficulty})
         })
-    }, cloudHosts)
+    }, cloudHosts)//.concat({host:'home',maxRam:ns.getServerMaxRam()-1024,cpuCores:4,status:'root'}))
       .filter(({queue}) => queue?.length)
       .forEach(({ host:botHost, queue, freeRam }) =>
         queue.forEach(({host,level,moneyMax,minDifficulty}) =>
@@ -181,7 +182,7 @@ export async function main(ns) {
   if(ns.args[0] === 'debug')
     return ns.tprint(jssn`INFO ${targets[0].getAllocation().length}`)
   killPrevious(ns)
-  while(ns.args[0] === 'cloudy') {
+  while(ns.args[0] === 'cloudy'||1) {
     await ns.asleep(3e4)
     const hackingLevel = ns.getPlayer().skills.hacking
     const newTargets = highLevel

@@ -32,7 +32,7 @@ const traitor = async (ns, batches, {target}, duration, skipHack, port=1) => {
       i++
       //if(delay < -actDelta) console.error('drift='+delay)
       //await ns.asleep(Math.floor(actDelta+delay))
-    } else await ns.asleep(Math.max(1,Math.floor(delay)))
+    } else await (delay>0 ? ns.asleep(Math.floor(delay)) : Promise.resolve())
   }
   const ncbDelay = gAlign(duration, startTime)
   if(ncbDelay) {
@@ -59,7 +59,7 @@ const prep = async (ns,{host,moneyMax,duration},bots,mm,es) => {
   const growTime = mm && ns.getGrowTime(host)^0
   const weakTime = mm && ns.getWeakenTime(host)^0
   const syncTime = mm && weakTime - growTime + actDelta
-  const growTargetAmount = mm && Math.max(10, moneyMax / (moneyMax - mm))
+  const growTargetAmount = mm && Math.min(16, moneyMax / (moneyMax - mm))
   const growThreads = mm && Math.min(
     Math.ceil(ns.growthAnalyze(host, growTargetAmount, 2)),
     homeSlts
@@ -100,11 +100,11 @@ const orchids = async (ns, hitlist, botnet, freeRam) => {
     if((mm = moneyMax-ns.getServerMoneyAvailable(target)),
         (es = ns.getServerSecurityLevel(target) - minDifficulty) || mm) {
       if(mm && es && (mm/moneyMax > .4 || es/minDifficulty > .2)) {
-        ns.tprint(`ERROR ${ts()}needs to be topped:\n$${(100*mm/moneyMax).toFixed(2)}% +${es.toFixed(6)}`)
+        console.error(`ERROR ${ts()}${target} needs :$-${(100*mm/moneyMax).toFixed(2)}% +${es.toFixed(2)}`)
         fails++
       }
       if(fails > failThreshold) {
-        ns.tprint(`ERROR ${ts()}many fails...`)
+        console.error(`ERROR ${ts()}many fails...`, fails)
         await ns.asleep(batchDelta)
       }
       await prep(ns, hitlist[0], fb, mm, es)
@@ -123,13 +123,6 @@ const getPossibleUpgrade = (csRam, newRam, checkCost) =>
 export async function main(ns) {
   const [cs, host, level, moneyMax, minDifficulty, freeRam] = ns.args
   const target = { host, level, moneyMax, minDifficulty }
-  const uMoney = ns.getPlayer().money * moneyRatio
-  const csRam = ns.getServerMaxRam(cs)
-  const ramLimit = ns.cloud.getRamLimit()
-  const upgrade = csRam < ramLimit && getPossibleUpgrade(csRam, ramLimit,
-    ram => ns.cloud.getServerUpgradeCost(cs, ram) < uMoney)
-  if(upgrade) ns.cloud.upgradeServer(cs, upgrade)
-
   const botnet = [{
     host:cs,
     maxRam:ns.getServerMaxRam(cs)-ns.getServerUsedRam(cs),
@@ -144,7 +137,7 @@ export async function main(ns) {
 
   ns.tprint(jssn`INFO targetting ${targets} from ${cs}`)
 
-  console.log(upgrade, ramLimit, csRam, uMoney, targets, cs, botnet)
+  console.log(targets, cs, botnet)
 
   killPrevious(ns)
   return orchids(ns, targets, botnet, freeRam)

@@ -16,8 +16,9 @@ export async function main(ns) {
     ].concat(hosts)
       .filter(({host}) => cloudHosts.every(cs=>cs.host !== host))
       .filter(({ status, maxRam }) => status === 'root' && maxRam)
-      .concat({host:'cs40',maxRam:ns.getServerMaxRam('cs40'),cpuCores:1,status:'root'})
-      .concat({host:'cs30',maxRam:ns.getServerMaxRam('cs30'),cpuCores:1,status:'root'})
+//      .concat({host:'cs40',maxRam:ns.getServerMaxRam('cs40'),cpuCores:1,status:'root'})
+      //.concat({host:'cs50',maxRam:ns.getServerMaxRam('cs50'),cpuCores:1,status:'root'})
+      .concat(ns.args?.map(h=>({host:h,maxRam:ns.getServerMaxRam(h),cpuCores:1,status:'root'})))
       .toSorted(multiSort(['cpuCores'],['maxRam']))
 
     const cores = Array.from(new Set(botnet.map(({cpuCores})=>cpuCores)))
@@ -45,7 +46,7 @@ export async function main(ns) {
         return ns.exec('scripts/top.js', botHost, { ramOverride: ram, threads },
           host, moneyMax, minDifficulty)
       })
-    })
+    }).filter(Boolean)
     for(let ppids, sleep=5000;
       ppids = pids.filter(pid=>ns.getRunningScript(pid));
       await ns.asleep(Math.max(30000,sleep++)))

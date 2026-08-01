@@ -23,7 +23,7 @@ export const getWeakSecurity = coreCount => allWeakSec[coreCount-1]
 
 const growSecurity = .004//ns.growthAnalyzeSecurity(1) // .004 * thread
 const hackSecurity = .002//ns.hackAnalyzeSecurity(1) // .002*thread
-const maxTargetPercent = .18
+const maxTargetPercent = .25
 const minTargetPercent = .02
 const calcPercent = (level, hackLevel) =>
   Math.max(Math.min(maxTargetPercent*(1-level/hackLevel), maxTargetPercent), minTargetPercent)
@@ -115,6 +115,7 @@ export const getBatchData = (ns, { host, moneyMax, level }, cores=allCores, delt
     .map(addCost)
 
   const batchMoney = hackThreads*hackPerThread*moneyMax
+  console.log(batchMoney)
   const totalRam = batch.reduce((total, {optimalCost}) => total+optimalCost, 0)
 
   return {
