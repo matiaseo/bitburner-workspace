@@ -26,7 +26,7 @@ const filterServerData = serverInfo =>
   )
 
 /** @param {NS} ns */
-const getUsefulValues = (ns, host) => {
+const getUsefulValues = (ns, host, path) => {
 //  const hasRoot = ns.hasRootAccess(host)
   const {
     sshPortOpen,
@@ -43,6 +43,7 @@ const getUsefulValues = (ns, host) => {
     cpuCores,
     serverGrowth
   } = ns.getServer(host)
+  console.log('ls', host, ns.ls(host))
   //const hackChance = ns.hackAnalyzeChance(host)
   //const hackAmount = ns.hackAnalyze(host)
   //const hackSecurity = ns.hackAnalyzeSecurity(1) // .002*thread
@@ -54,6 +55,14 @@ const getUsefulValues = (ns, host) => {
   //const rate = perSecond && deformat(perSecond)
   //const efficiency = perGB && deformat(perGB)
   //if(perSecond) ns.tprint('ERROR '+[perSecond, perGB, attackTime, totalRam, host, level, moneyMax])
+  const connects = path.concat(host).map(h=>'connect '+h)
+  const files = ns.ls(host).filter(x=>!x.startsWith('scripts/'))
+  const contracts = files.filter(f=>/\.cct$/.test(f))
+    .map(c=>[
+      connects.concat(`run ${c}`).join(';'),
+      ns.codingcontract.getContractType(c,host),
+      ns.codingcontract.getData(c,host),
+    ])
 
   return {
     level,
@@ -76,7 +85,11 @@ const getUsefulValues = (ns, host) => {
     cpuCores,
     //info: ns.getServer(host),
     status: hasRoot ? 'root' : numOpenPortsRequired,
-    command: `scripts/chack.js home ${host} ${level} ${moneyMax} ${minDifficulty} 32`
+    connect: connects.join(';'),
+    backdoor: connects.concat('backdoor').join(';'),
+    command: `scripts/chack.js home ${host} ${level} ${moneyMax} ${minDifficulty} 32`,
+    files,
+    contracts,
     //hasRoot,
     //...details
   }
@@ -85,8 +98,7 @@ const getUsefulValues = (ns, host) => {
 /** @param {NS} ns */
 const getInfo = (ns, path) => host => ({
   host, path: ''+path, distance: path.length,
-  connect:path.concat(host).map(h=>'connect '+h).join(';'),
-  ...getUsefulValues(ns, host),
+  ...getUsefulValues(ns, host, path),
   //...filterServerData(ns.getServer(host))
 })
 
