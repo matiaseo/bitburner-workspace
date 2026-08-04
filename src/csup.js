@@ -10,7 +10,7 @@ export function main(ns) {
   const [count] = ns.args
   if(count)
     for(let i=ns.cloud.getServerNames().length; i < count; i++)
-      ns.cloud.purchaseServer(`cs${i.toString(16).padStart(2,'0').reverse()}`, 8)
+      ns.cloud.purchaseServer(`cs${i.toString(16).padStart(2,'0').split('').reverse().join('')}`, 8)
   const ramLimit = ns.cloud.getRamLimit()
   ns.cloud.getServerNames()
     .forEach(cs => {

@@ -36,7 +36,7 @@ const traitor = async (ns, batches, {target}, duration, skipHack, port=1) => {
   }
   const ncbDelay = gAlign(duration, startTime)
   if(ncbDelay) {
-    ns.tprint('WARN'+ts()+'sleep before check '+ncbDelay/1000+'s')
+    //ns.tprint('WARN'+ts()+'sleep before check '+ncbDelay/1000+'s')
     await ns.asleep(ncbDelay)
   }
 }
