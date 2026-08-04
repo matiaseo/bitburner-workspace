@@ -1,6 +1,6 @@
 import { caesar } from "./caesar.js";
 import { totalWaysToSum } from "./eulerpentagon.js";
-import { flatten, jssn } from './helpers.js'
+import { flatten, jisn, jssn } from './helpers.js'
 import { findMaxSSum } from "./maxSubSum.js";
 //import { scan } from "./scanner.js"
 
@@ -20,12 +20,15 @@ const getInfo = (ns, path) => host => {
       .map(c => {
         const type = ns.codingcontract.getContractType(c,host)
         const input = ns.codingcontract.getData(c,host)
-        console.debug(input)
+        const result = getTool(type)?.(input)??'no tool'
         return {
+          contract: c,
           type,
           input,
           text: ns.codingcontract.getDescription(c,host),
-          result: getTool(type)?.(input)??'no tool'
+          result,
+          solve: result !== 'no tool' &&
+            (() => ns.codingcontract.attempt(result, c, host))
         }
       })
   }
@@ -46,5 +49,11 @@ const scan = (ns, depth, base, path=['home']) =>
 /** @param {NS} ns */
 export function main(ns) {
   const hosts = flatten(scan(ns, 32))
-  ns.tprint(jssn`WARN ${hosts}`)
+  const contracts = hosts.flatMap(({contracts})=>contracts)
+  const results = (ns.args[0] === 'solve') ?
+    contracts.filter(({result})=>result!=='no tool')
+      .map(({solve})=> solve()) : 'no solving'
+  ns.tprint(jssn`WARN ${hosts} [${hosts.length}]`)
+  ns.tprint(jssn`WARN ${contracts} [${contracts.length}]`)
+  ns.tprint(jisn`ERROR solved: ${results}`)
 }
