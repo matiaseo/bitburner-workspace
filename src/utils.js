@@ -7,8 +7,8 @@ export const killPrevious = ns =>
     .filter(id => id !== ns.pid)
     .forEach(id => ns.kill(id))
 
-export const respawn = (ns, threads=1, spawnDelay=0) =>
-  ns.spawn(ns.getScriptName(), {threads, spawnDelay})
+//export const respawn = (ns, threads=1, spawnDelay=0) =>
+//  ns.spawn(ns.getScriptName(), {threads, spawnDelay})
 
 /** @param {NS} ns */
 export const deploy = (ns, scripts, hosts) =>
@@ -152,7 +152,7 @@ const getOrderedThreads = (threads, optimal) =>
 const deductCost = (orderedThreads, resources, act, allocatedActs) => {
   const resCount = Object.keys(resources).length
   for(let i=0; i < resCount; i++) {
-    const [cores, [threads, mem]] = orderedThreads[i]
+    const [cores, [threads, mem]] = orderedThreads[i%orderedThreads.length]
     const [leftovers, host] = resources[cores].reduce(
         ([leftovers, h], { host, ram }) =>
           h ? [leftovers.concat({host,ram}), h]

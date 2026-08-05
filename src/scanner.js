@@ -1,5 +1,5 @@
 import { compactArrays, deformat } from "./helpers.js"
-import { getBatchData } from "./utils.js";
+//import { getBatchData } from "./utils.js";
 
 const usefulInfo = [
   'requiredHackingSkill',
@@ -41,7 +41,8 @@ const getUsefulValues = (ns, host, path) => {
     maxRam,
     ramUsed,
     cpuCores,
-    serverGrowth
+    serverGrowth,
+    purchasedByPlayer
   } = ns.getServer(host)
   console.log('ls', host, ns.ls(host))
   //const hackChance = ns.hackAnalyzeChance(host)
@@ -60,11 +61,14 @@ const getUsefulValues = (ns, host, path) => {
   const contracts = files.filter(f=>/\.cct$/.test(f))
     .map(c=>[
       connects.concat(`run ${c}`).join(';'),
-      ns.codingcontract.getContractType(c,host),
-      ns.codingcontract.getData(c,host),
+//      ns.codingcontract.getContractType(c,host),
+//      ns.codingcontract.getData(c,host),
     ])
 
-  return {
+  return purchasedByPlayer ? {host, maxRam, cloud:purchasedByPlayer, cpuCores, status:'root'} : {
+    host,
+    path: ''+path,
+    distance: path.length,
     level,
     minDifficulty,
     hackDifficulty,
@@ -96,11 +100,11 @@ const getUsefulValues = (ns, host, path) => {
 }
 
 /** @param {NS} ns */
-const getInfo = (ns, path) => host => ({
-  host, path: ''+path, distance: path.length,
+const getInfo = (ns, path) => host => getUsefulValues(ns, host, path)/*({
+  //host, path: ''+path, //distance: path.length,
   ...getUsefulValues(ns, host, path),
   //...filterServerData(ns.getServer(host))
-})
+})*/
 
 export const scan = (ns, depth, base, path=['home']) =>
   !depth ? [getInfo(ns, path)(base)] :

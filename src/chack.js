@@ -1,9 +1,9 @@
 import { jssn, multiSort, ts } from './helpers.js'
-import { killPrevious, respawn,
+import { killPrevious, 
   getWeakSecurity, addAllocation, getRamListByCores } from "./utils.js"
 
 const stealer = 'scripts/steal.js'
-const actDelta = 200
+const actDelta = 100
 const checkWindow = actDelta*3
 const batchDelta = actDelta*4 + checkWindow
 const baseOrchDelay = actDelta >> 1
@@ -102,7 +102,7 @@ const orchids = async (ns, hitlist, botnet, freeRam) => {
       if(mm && es && (mm/moneyMax > .4 || es/minDifficulty > .2)) {
         console.error(`ERROR ${ts()}${target} needs :$-${(100*mm/moneyMax).toFixed(2)}% +${es.toFixed(2)}`)
         fails++
-      }
+      } else fails--
       if(fails > failThreshold) {
         console.error(`ERROR ${ts()}many fails...`, fails)
         await ns.asleep(batchDelta)

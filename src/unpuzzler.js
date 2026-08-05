@@ -7,7 +7,17 @@ import { findMaxSSum } from "./maxSubSum.js";
 const getTool = type => ({
   "Subarray with Maximum Sum": findMaxSSum,
   "Total Ways to Sum": totalWaysToSum,
-  "Encryption I: Caesar Cipher": caesar
+  "Encryption I: Caesar Cipher": caesar,
+  "Algorithmic Stock Trader I": a => Math.max(0,...a.map((p,d)=>Math.max(...a.slice(d))-p)),
+  "Find Largest Prime Factor": n => {
+    for(let d=2,c=n;d<n;) {
+      if(!(c%d)) c/=d
+      else d++
+      if(d*d>c)
+        return c
+    }
+  },
+
 }[type])
 
 /** @param {NS} ns */
@@ -26,9 +36,13 @@ const getInfo = (ns, path) => host => {
           type,
           input,
           text: ns.codingcontract.getDescription(c,host),
+          attempts: ns.codingcontract.getNumTriesRemaining(c,host),
           result,
-          solve: result !== 'no tool' &&
-            (() => ns.codingcontract.attempt(result, c, host))
+          solve: result !== 'no tool' && (
+            () => ns.codingcontract.attempt(result, c, host)
+              || `FAILED ${type} ${input} -> ${result} ; tries=${
+                ns.codingcontract.getNumTriesRemaining(c,host)}`
+          )
         }
       })
   }
@@ -44,16 +58,19 @@ const scan = (ns, depth, base, path=['home']) =>
           const connected = scan(ns, depth-1, target.host, path.concat(target.host)).slice(1)
           return Object.assign({}, target, !!connected.length && { connected })
         })
-    ).filter(({contracts}={})=>contracts?.length)
+    ).filter(Boolean)
 
 /** @param {NS} ns */
 export function main(ns) {
-  const hosts = flatten(scan(ns, 32))
+  const hosts = flatten(scan(ns, 32)).filter(({contracts:{length}})=>length)
+
   const contracts = hosts.flatMap(({contracts})=>contracts)
+  console.debug(contracts, hosts)
   const results = (ns.args[0] === 'solve') ?
     contracts.filter(({result})=>result!=='no tool')
       .map(({solve})=> solve()) : 'no solving'
   ns.tprint(jssn`WARN ${hosts} [${hosts.length}]`)
   ns.tprint(jssn`WARN ${contracts} [${contracts.length}]`)
-  ns.tprint(jisn`ERROR solved: ${results}`)
+  ns.tprint(jisn`ERROR solved: ${results} [${
+    typeof results=='string' ? 0 : results.length}]`)
 }
