@@ -107,7 +107,7 @@ const orchids = async (ns, hitlist, botnet, freeRam) => {
         console.error(`ERROR ${ts()}many fails...`, fails)
         await ns.asleep(batchDelta)
       }
-      await prep(ns, hitlist[0], fb, mm, es)
+      //await prep(ns, hitlist[0], fb, mm, es)
     } else fails >>= 1
     await traitor(ns, batches, {target,moneyMax,minDifficulty}, duration, fails>failThreshold)
   }

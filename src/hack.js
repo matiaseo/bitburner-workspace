@@ -129,7 +129,7 @@ const gAlign = (duration, startTime, strict=false) => {
 export async function main(ns) {
   const hostTree = scan(ns, 32)
   const hosts = flatten(hostTree)
-  const cloudHosts = []//hosts.filter(({host}) => /^cs\d{2}$/.test(host))
+  const cloudHosts = hosts.filter(({cloud}) => cloud)
   const hackingLevel = ns.getPlayer().skills.hacking
   const botnet = [
     {host:'home',maxRam:ns.getServerMaxRam()-Math.max(1024, ns.getServerMaxRam()*.80),cpuCores:4,status:'root'}

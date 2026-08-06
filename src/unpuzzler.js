@@ -73,4 +73,6 @@ export function main(ns) {
   ns.tprint(jssn`WARN ${contracts} [${contracts.length}]`)
   ns.tprint(jisn`ERROR solved: ${results} [${
     typeof results=='string' ? 0 : results.length}]`)
+  if(ns.args[0] === 'getNext')
+    ns.codingcontract.createDummyContract(ns.codingcontract.getContractTypes().find(t=>!getTool(t)))
 }
