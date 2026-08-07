@@ -16,8 +16,10 @@ export const str = data => JSON.stringify(data, null, 2)
 
 const zip = (aa, bb) => aa.flatMap((a, index) => [a, bb[index] ?? ''])
 
+const cBigInt = (k,v)=> typeof v !== 'bigint' ? v : `${v}n`
+
 export const jisn = (tt, ...xx) =>
-  zip(tt, xx.map(x => typeof x === 'string' ? x : JSON.stringify(x ?? null, null, 2)))
+  zip(tt, xx.map(x => typeof x === 'string' ? x : JSON.stringify(x ?? null, cBigInt, 2)))
     .filter(Boolean)
     .join('')
 
@@ -39,7 +41,7 @@ export const compactArrays = obj =>
 export const jssn = (tt, ...xx) =>
   zip(tt, xx.map(x =>
     typeof x !== 'object' ? x
-      : JSON.stringify(compactArrays(x) ?? null, null, 2)
+      : JSON.stringify(compactArrays(x) ?? null, cBigInt, 2)
     )
   )
     .filter(Boolean)

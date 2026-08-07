@@ -104,5 +104,5 @@ export function main(ns) {
   ns.tprint(jisn`ERROR solved: ${results} [${
     typeof results=='string' ? 0 : results.length}/${contracts.length}]`)
   if(ns.args[0] === 'getNext')
-    ns.codingcontract.createDummyContract(ns.codingcontract.getContractTypes().find(t=>!getTool(t)))
+    ns.codingcontract.getContractTypes().filter(t=>!getTool(t)).forEach(t=>ns.codingcontract.createDummyContract(t))
 }
