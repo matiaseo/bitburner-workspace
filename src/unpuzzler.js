@@ -7,6 +7,15 @@ import { findMaxSSum } from "./maxSubSum.js";
 const getTool = type => ({
   "Subarray with Maximum Sum": findMaxSSum,
   "Total Ways to Sum": totalWaysToSum,
+  "Total Ways to Sum II": ([n, a]) => {
+    const m = new Array(n+1)
+    const coins = a.toSorted()
+    for(let i=0; i < n+1; i+=coins[0]) m[i]=1
+    for(let j=0, coin; coin=coins[++j];)
+      for(let target=1; target < n+1; target++)
+        m[target] = (m[target]??0) + (m[target-coin]??0)
+    return m[n]
+  },
   "Encryption I: Caesar Cipher": caesar,
   "Algorithmic Stock Trader I": a => Math.max(0,...a.map((p,d)=>Math.max(...a.slice(d))-p)),
   "Find Largest Prime Factor": n => {
@@ -17,8 +26,28 @@ const getTool = type => ({
         return c
     }
   },
-
+  "Spiralize Matrix": m => {
+    let x1=0,y1=0,x2=m[0].length,y2=m.length
+    const output = new Array(x2*y2)
+    for(let i=0,d=0; i < output.length; d = (d+1)%4)
+      switch(d) {
+        case 0: output.splice(i, x2-x1, ...m[y1++].slice(x1,x2))
+          i += x2-x1
+        break;case 1: --x2
+          for(let y=y1; y<y2;) output[i++] = m[y++][x2]
+        break;case 2: --y2
+          for(let x=x2; x>x1;) output[i++] = m[y2][--x]
+        break;case 3:
+          for(let y=y2; y>y1;) output[i++] = m[--y][x1]
+          x1++
+      }
+    return output
+  },
 }[type])
+
+const trying = func => {
+  try{ return func() } catch(e) {}
+}
 
 /** @param {NS} ns */
 const getInfo = (ns, path) => host => {
@@ -30,7 +59,7 @@ const getInfo = (ns, path) => host => {
       .map(c => {
         const type = ns.codingcontract.getContractType(c,host)
         const input = ns.codingcontract.getData(c,host)
-        const result = getTool(type)?.(input)??'no tool'
+        const result = trying(()=>getTool(type)?.(input))??'no tool'
         return {
           contract: c,
           type,
@@ -62,17 +91,18 @@ const scan = (ns, depth, base, path=['home']) =>
 
 /** @param {NS} ns */
 export function main(ns) {
-  const hosts = flatten(scan(ns, 32)).filter(({contracts:{length}})=>length)
-
+  const hosts = flatten(scan(ns, 32))
+    .concat(ns.args[1] === 'home' ? getInfo(ns, [])('home') : [])
+    .filter(({contracts:{length}})=>length)
   const contracts = hosts.flatMap(({contracts})=>contracts)
   console.debug(contracts, hosts)
   const results = (ns.args[0] === 'solve') ?
     contracts.filter(({result})=>result!=='no tool')
       .map(({solve})=> solve()) : 'no solving'
   ns.tprint(jssn`WARN ${hosts} [${hosts.length}]`)
-  ns.tprint(jssn`WARN ${contracts} [${contracts.length}]`)
+  //ns.tprint(jssn`WARN ${contracts} [${contracts.length}]`)
   ns.tprint(jisn`ERROR solved: ${results} [${
-    typeof results=='string' ? 0 : results.length}]`)
+    typeof results=='string' ? 0 : results.length}/${contracts.length}]`)
   if(ns.args[0] === 'getNext')
     ns.codingcontract.createDummyContract(ns.codingcontract.getContractTypes().find(t=>!getTool(t)))
 }
