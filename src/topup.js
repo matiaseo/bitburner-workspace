@@ -29,9 +29,9 @@ export async function main(ns) {
     //console.log(eligibleHosts, botnet, botnetResources)
     const targets = eligibleHosts//selectTop(eligibleHosts, 1+cloudHosts.length)
       .filter(({ level, moneyMax, minDifficulty, host }) =>
-        hackingLevel >= level && moneyMax
-          && (ns.getServerSecurityLevel(host) > minDifficulty
-            || ns.getServerMoneyAvailable(host) < moneyMax))
+        hackingLevel >= level && moneyMax)
+//          && (ns.getServerSecurityLevel(host) > minDifficulty
+//            || ns.getServerMoneyAvailable(host) < moneyMax))
       .toSorted((a, b) => b.moneyMax - a.moneyMax)
       .filter(Boolean)
     if(!targets.length) return ns.tprint('ERROR no targets')
