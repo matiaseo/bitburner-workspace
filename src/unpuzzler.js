@@ -43,6 +43,13 @@ const getTool = type => ({
       }
     return output
   },
+  "Compression I: RLE Compression": input =>
+    input.split('').reduce(([out, count, char], c) => {
+      if(char === c) {
+        const nextCount = (count+1)%10
+        return [!nextCount ? out+count+char : out, nextCount||1, char]
+      } else return [count ? out+count+char : out, 1, c]
+    }, ['', 0, '']).join(''),
 }[type])
 
 const trying = func => {
