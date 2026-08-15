@@ -52,7 +52,6 @@ const getTool = type => ({
     }, ['', 0, '']).join(''),
   "Merge Overlapping Intervals": array => {
     const sa = array.toSorted((a,b)=>(a[0]-b[0])||(a[1]-b[1]))
-    console.log(JSON.stringify(sa))
     const out = []
     for(let i=0; i<sa.length;) {
       const istart = sa[i][0]
