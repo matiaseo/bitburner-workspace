@@ -70,6 +70,8 @@ const getTool = type => ({
        return [min,max,pfs]
      }, [md[0], md[0], [0]])[2]
       .sort((a,b)=>a-b).slice(-2).reduce((a,b)=>a+b),
+  "Algorithmic Stock Trader II": md =>
+    md.reduce(([prev,pf], d) => [d, d>prev? pf+(d-prev) : pf], [Infinity, 0])[1],
 }[type])
 
 const trying = func => {
