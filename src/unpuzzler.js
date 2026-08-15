@@ -50,6 +50,27 @@ const getTool = type => ({
         return [!nextCount ? out+count+char : out, nextCount||1, char]
       } else return [count ? out+count+char : out, 1, c]
     }, ['', 0, '']).join(''),
+  "Merge Overlapping Intervals": array => {
+    const sa = array.toSorted((a,b)=>(a[0]-b[0])||(a[1]-b[1]))
+    console.log(JSON.stringify(sa))
+    const out = []
+    for(let i=0; i<sa.length;) {
+      const istart = sa[i][0]
+      let iend = sa[i][1]
+      while(++i<sa.length && sa[i][0] <= iend)
+        iend = Math.max(iend, sa[i][1])
+      out.push([istart, iend])
+    }
+    return out
+  },
+  "Algorithmic Stock Trader III": md =>
+    md.reduce(([min,max,pfs], d, i, {length:l}) => {
+       if(d < min) return [d, d, pfs.concat(max-min)]
+       if(d > max) return [min, d, pfs.concat(i===l-1?d-min:[])]
+       if(d < max) return [min, max, pfs.concat(max-min)]
+       return [min,max,pfs]
+     }, [md[0], md[0], [0]])[2]
+      .sort((a,b)=>a-b).slice(-2).reduce((a,b)=>a+b),
 }[type])
 
 const trying = func => {
